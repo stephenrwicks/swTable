@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>swTable()</title>
+    <link rel="stylesheet" href="swTable.css">
+    <script src="swTable.js"></script>
+</head>
+
+<body>
+    <h1>swTable()</h1>
+    <p>Here's my flexible and reactive data table component for vanilla html/css/js. No dependencies or framework - it's just a function.</p>
+    <p>Automatically displays json data in a table. Reactivity is built-in. When you update the data for a row, the <code>&lt;tr&gt;</code> will rerender.
+    </p>
+    <p>It can also handle computed values. A column can be a combination of multiple keys.</p>
+    <p>Options and data can be set on initialization and can be modified after initialization.</p>
+    <p>Written with TS.</p>
+
+    <script>
+        const table = swTable({
+            theme: 'mint'
+        });
+        table.data.init([
+            { id: 1, name: 'Alice', age: 28, city: 'Boston' },
+            { id: 2, name: 'Bob', age: 34, city: 'Los Angeles' },
+            { id: 3, name: 'Charlie', age: 25, city: 'Chicago' },
+            { id: 4, name: 'Diana', age: 29, city: 'Houston' },
+            { id: 5, name: 'Evan', age: 41, city: 'Philadelphia' },
+            { id: 6, name: 'Fiona', age: 31, city: 'San Antonio' },
+            { id: 7, name: 'George', age: 37, city: 'San Diego' },
+            { id: 8, name: 'Hannah', age: 22, city: 'Dallas' },
+            { id: 9, name: 'Ian', age: 45, city: 'San Jose' },
+            { id: 10, name: 'Jasmine', age: 30, city: 'Austin' },
+            { id: 11, name: 'Kyle', age: 27, city: 'Jacksonville' },
+            { id: 12, name: 'Laura', age: 32, city: 'Fort Worth' },
+            { id: 13, name: 'Mike', age: 36, city: 'Columbus' },
+            { id: 14, name: 'Nina', age: 24, city: 'Charlotte' },
+            { id: 15, name: 'Oscar', age: 43, city: 'San Francisco' },
+            { id: 16, name: 'Paula', age: 29, city: 'Indianapolis' },
+            { id: 17, name: 'Quentin', age: 35, city: 'Seattle' },
+            { id: 18, name: 'Rachel', age: 33, city: 'Denver' },
+            { id: 19, name: 'Sam', age: 26, city: 'Washington' },
+            { id: 20, name: 'Tina', age: 40, city: 'Boston' },
+            { id: 21, name: 'Ulysses', age: 28, city: 'El Paso' },
+            { id: 22, name: 'Victoria', age: 31, city: 'Detroit' },
+            { id: 23, name: 'Walter', age: 39, city: 'Nashville' },
+            { id: 24, name: 'Xena', age: 23, city: 'Memphis' },
+            { id: 25, name: 'Yvonne', age: 42, city: 'Louisville' },
+            { id: 26, name: 'Zach', age: 27, city: 'Baltimore' },
+            { id: 27, name: 'Aiden', age: 34, city: 'Milwaukee' },
+            { id: 28, name: 'Bianca', age: 30, city: 'Albuquerque' },
+            { id: 29, name: 'Carlos', age: 38, city: 'Tucson' },
+            { id: 30, name: 'Danielle', age: 25, city: 'Fresno' }
+        ]);
+        table.columns.init([
+            {
+                name: 'ID',
+                render(row) {
+                    return row.data.id;
+                }
+            },
+            {
+                name: 'Name',
+                render(row) {
+                    return row.data.name
+                }
+            },
+            {
+                name: 'city',
+                render(row) {
+                    return `This person lives in ${row.data.city ?? 'somewhere unknown'}.`;
+                }
+            },
+            {
+                name: 'age plus id',
+                render: (row) => row.data.age + row.data.id
+            },
+        ]);
+        table.builtInDetailRowColumn.setDetailRowContent((row) => {
+            return 'Details'
+        });
+        document.body.append(table.element);
+
+        // table.initRows()
+        // table.initColumns()
+        // table.initData()
+        // table.rows =
+        // table.columns = 
+    </script>
+</body>
+
+</html>
