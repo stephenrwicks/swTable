@@ -12,7 +12,7 @@
     --sw-table-ice-accent: rgb(0, 255, 208);
 }
 
-.sw-table.sw-table-mint-theme {
+.sw-table[data-sw-table-theme="mint"] {
     /* Mint theme */
     font-family: 'Segoe UI', sans-serif;
     --sw-table-font-color: black;
@@ -26,7 +26,7 @@
     --sw-table-outer-border: var(--sw-table-mint-dark);
 }
 
-.sw-table.sw-table-ice-theme {
+.sw-table[data-sw-table-theme="ice"]{
     /* Ice theme */
 
     /* These themes could be abstracted an extra layer so that it is --sw-table-theme-dark etc.
@@ -55,7 +55,7 @@
     grid-auto-flow: column;
 }
 
-.sw-table-tr.sw-table-detail-tr-open .sw-table-icon {
+.sw-table-tr.sw-table-detail-tr-open .sw-table-detail-button .sw-table-icon {
     transform: rotate(90deg);
 }
 
