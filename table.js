@@ -17,49 +17,55 @@ class Table {
     #checkboxTh = null;
     #selectAllCheckbox = null;
     #actionsTh = null;
+    // Store built ins alongside other cols, with order property
+    #columnsObject = {
+        detailTh: null,
+        checkboxTh: null,
+        actionsTh: null
+    };
     #currentPage = 1;
     constructor(settings) {
         if (!settings?.columns)
             throw new Error('SwTable - no columns defined');
         // The order of things here is important
-        if (typeof settings.detailFn === 'function') {
-            this.detailFn = settings.detailFn;
+        for (const col of settings.columns) {
+            const column = new Column(col);
+            columnToTable.set(column, this);
+            this.#columns.push(column); // Could assign to object by id
+            this.#theadTr.append(column.th);
         }
-        ;
-        if (typeof settings.checkboxFn === 'function') {
-            this.#checkboxFn = settings.checkboxFn;
-        }
-        ;
-        if (typeof settings.actionsFn === 'function') {
-            this.#actionsFn = settings.actionsFn;
-        }
-        ;
-        for (const column of settings.columns) {
-            this.insertColumn(column);
-        }
-        // this.columns = settings.columns;
         if (settings.data?.length) {
             for (const datum of settings.data) {
                 this.insertRow(datum);
             }
         }
         this.showSearch = !!settings.showSearch;
-        this.#updateDetailColumn();
-        this.#updateCheckboxColumn();
-        this.#updateActionsColumn();
+        // this.#updateDetailColumn();
+        // this.#updateCheckboxColumn();
+        // this.#updateActionsColumn();
+        if (typeof settings.detailFn === 'function') {
+            this.detailFn = settings.detailFn;
+        }
+        ;
+        if (typeof settings.checkboxFn === 'function') {
+            this.checkboxFn = settings.checkboxFn;
+        }
+        ;
+        if (typeof settings.actionsFn === 'function') {
+            this.actionsFn = settings.actionsFn;
+        }
+        ;
         if (typeof settings.pageLength === 'number') {
             this.pageLength = settings.pageLength;
         }
         else {
             this.goToPage(1);
         }
-        this.showSearch = !!settings.showSearch;
         this.#thead.append(this.#theadTr);
         this.#tfootTr.append(this.#tfootTd);
         this.#tfoot.append(this.#tfootTr);
         this.#table.append(this.#thead, this.#tbody, this.#tfoot);
         this.#wrapper.append(this.#topDiv, this.#table);
-        this.#table.classList.add(css.table);
         this.#topDiv.classList.add(css.header);
         this.#wrapper.classList.add(css.wrapper);
         if (typeof settings.theme === 'string')
@@ -117,16 +123,14 @@ class Table {
         return this.#columns;
     }
     insertColumn(settings, index) {
+        if (!settings || typeof index !== 'number')
+            throw new Error('SwTable insertColumn');
         const column = new Column(settings);
         columnToTable.set(column, this);
-        if (typeof index === 'number' && this.#columns.length) {
-            this.#columns[index].th.before(column.th);
-            this.#columns.splice(index, 0, column);
-        }
-        else {
-            this.#columns.push(column);
-            this.#theadTr.append(column.th);
-        }
+        this.#columns[index].th.before(column.th);
+        this.#columns.splice(index, 0, column);
+        for (const row of this.rows)
+            row.render();
     }
     destroyColumn(index) {
         this.columns[index].destroy();
@@ -157,9 +161,11 @@ class Table {
         this.#detailFn = fn;
         if (!this.rows.length)
             return;
-        for (const row of this.rows)
-            row.renderDetail();
         this.#updateDetailColumn();
+        for (const row of this.rows) {
+            row.renderCells();
+            row.renderDetail();
+        }
     }
     #checkboxFn = null;
     get checkboxFn() {
@@ -169,9 +175,11 @@ class Table {
         this.#checkboxFn = fn;
         if (!this.rows.length)
             return;
-        for (const row of this.rows)
-            row.renderCheckbox();
         this.#updateCheckboxColumn();
+        for (const row of this.rows) {
+            row.renderCells();
+            row.renderCheckbox();
+        }
     }
     #actionsFn = null;
     get actionsFn() {
@@ -181,9 +189,11 @@ class Table {
         this.#actionsFn = fn;
         if (!this.rows.length)
             return;
-        for (const row of this.rows)
-            row.renderActions();
         this.#updateActionsColumn();
+        for (const row of this.rows) {
+            row.renderCells();
+            row.renderActions();
+        }
     }
     #updateDetailColumn() {
         if (typeof this.#detailFn === 'function') {
@@ -191,17 +201,15 @@ class Table {
             this.#detailTh.classList.add('sw-table-detail-th');
             this.#theadTr.prepend(this.#detailTh);
             for (const row of this.rows) {
-                row.detailTd ??= document.createElement('td');
-                row.tr.prepend(row.detailTd);
-                row.detailTd.append(row.detailButton ?? '');
+                row.cells.detailTd ??= document.createElement('td');
             }
         }
         else {
             this.#detailTh?.remove();
             this.#detailTh = null;
             for (const row of this.rows) {
-                row.detailTd?.remove();
-                row.detailTd = null;
+                row.cells.detailTd?.remove();
+                row.cells.detailTd = null;
             }
         }
     }
@@ -212,12 +220,10 @@ class Table {
             this.#checkboxTh ??= document.createElement('th');
             this.#checkboxTh.classList.add('sw-table-checkbox-th');
             this.#checkboxTh.append(this.#selectAllCheckbox);
-            this.#theadTr.prepend(this.#checkboxTh);
+            this.columns[this.columns.length - 1].th.after(this.#checkboxTh);
             this.#selectAllCheckbox.addEventListener('change', () => this.toggleCheckAllRows());
             for (const row of this.rows) {
-                row.checkboxTd ??= document.createElement('td');
-                row.tr.prepend(row.checkboxTd);
-                row.checkboxTd.append(row.checkbox ?? '');
+                row.cells.checkboxTd ??= document.createElement('td');
             }
         }
         else {
@@ -226,8 +232,8 @@ class Table {
             this.#checkboxTh?.remove();
             this.#checkboxTh = null;
             for (const row of this.rows) {
-                row.checkboxTd?.remove();
-                row.checkboxTd = null;
+                row.cells.checkboxTd?.remove();
+                row.cells.checkboxTd = null;
             }
         }
     }
@@ -235,19 +241,17 @@ class Table {
         if (typeof this.#actionsFn === 'function') {
             this.#actionsTh ??= document.createElement('th');
             this.#actionsTh.classList.add('sw-table-actions-th');
-            this.#theadTr.prepend(this.#actionsTh);
+            this.columns[this.columns.length - 1].th.after(this.#actionsTh);
             for (const row of this.rows) {
-                row.actionsTd ??= document.createElement('td');
-                row.tr.prepend(row.actionsTd);
-                row.actionsTd.append(row.actionsButton ?? '');
+                row.cells.actionsTd ??= document.createElement('td');
             }
         }
         else {
             this.#actionsTh?.remove();
             this.#actionsTh = null;
             for (const row of this.rows) {
-                row.actionsTd?.remove();
-                row.actionsTd = null;
+                row.cells.actionsTd?.remove();
+                row.cells.actionsTd = null;
             }
         }
     }
@@ -304,6 +308,7 @@ class Table {
         this.#pageLength = n;
         this.goToPage(1);
     }
+    // This is the single DOM placement method
     goToPage(n) {
         if (typeof n !== 'number')
             return;
@@ -314,10 +319,12 @@ class Table {
             n = this.numberOfPages;
         this.#tbody.replaceChildren();
         this.#currentPage = n;
-        this.rowsCurrentPage.forEach((row, i) => {
-            row.tr.classList.remove('sw-table-tr-even');
-            row.tr.classList.remove('sw-table-tr-odd');
-            row.tr.classList.add(i % 2 === 0 ? 'sw-table-tr-even' : 'sw-table-tr-odd');
+        const rowsCurrentPage = this.rowsCurrentPage;
+        rowsCurrentPage.forEach((row, i) => {
+            //if (!row.isRendered) row.render();
+            // row.tr.classList.remove('sw-table-tr-even');
+            // row.tr.classList.remove('sw-table-tr-odd');
+            // row.tr.classList.add(i % 2 === 0 ? 'sw-table-tr-even' : 'sw-table-tr-odd');
             this.#tbody.append(row.tr);
             const detail = rowToDetail.get(row);
             // if (detail) { 
@@ -325,18 +332,83 @@ class Table {
             //     this.#tbody.append(detail.tr);
             // }
         });
+        const first = this.rows.indexOf(rowsCurrentPage[0]) + 1;
+        const last = this.rows.indexOf(rowsCurrentPage[rowsCurrentPage.length - 1]) + 1;
+        this.#tfootTd.textContent = `Showing ${first}-${last} of ${this.#rows.length}`;
     }
 }
 const data = [
-    { id: 1, name: 'Alice', age: 28, city: 'Boston' },
-    { id: 2, name: 'Bob', age: 34, city: 'Los Angeles' },
-    { id: 3, name: 'Charlie', age: 25, city: 'Chicago' },
-    { id: 4, name: 'Diana', age: 29, city: 'Houston' },
+    {
+        id: 1,
+        name: 'Alice',
+        age: 28,
+        city: 'Boston',
+        address: {
+            street: '123 Main St',
+            zipCode: '02118',
+        },
+        hobbies: ['reading', 'cycling'],
+        employment: {
+            company: 'TechCorp',
+            role: 'Engineer',
+            tenure: 3, // years
+        },
+    },
+    {
+        id: 2,
+        name: 'Bob',
+        age: 34,
+        city: 'Los Angeles',
+        address: {
+            street: '456 Elm St',
+            zipCode: '90001',
+        },
+        hobbies: ['photography', 'cooking', 'hiking'],
+        employment: {
+            company: 'MediaHub',
+            role: 'Content Creator',
+            tenure: 5, // years
+        },
+    },
+    {
+        id: 3,
+        name: 'Charlie',
+        age: 25,
+        city: 'Chicago',
+        address: {
+            street: '789 Oak Ave',
+            zipCode: '60611',
+        },
+        hobbies: ['gaming', 'basketball'],
+        employment: {
+            company: 'AdSolutions',
+            role: 'Analyst',
+            tenure: 1, // years
+        },
+    },
+    {
+        id: 4,
+        name: 'Diana',
+        age: 29,
+        city: 'Houston',
+        address: {
+            street: '321 Pine Rd',
+            zipCode: '77002',
+        },
+        hobbies: ['painting', 'yoga'],
+        employment: {
+            company: 'HealthFirst',
+            role: 'Nurse',
+            tenure: 4, // years
+        },
+    },
 ];
+// Lazy rendering breaking dropdown and detail but not checkbox
 //@ts-ignore
 window.x = new Table({
     pageLength: 10,
-    columns: [{
+    columns: [
+        {
             name: 'ID',
             render(row) {
                 return row.data.id;
@@ -349,22 +421,46 @@ window.x = new Table({
             }
         },
         {
+            name: 'Hobbies',
+            render(row) {
+                return row.data.hobbies.toString();
+            }
+        },
+        {
             name: 'Age',
             render(row) {
                 return row.data.age;
+            },
+            sortBy(row) {
+                return row.data.age;
+            },
+        },
+        {
+            name: 'address',
+            render(row) {
+                return row.data.address.street + ' ' + row.data.address.zipCode;
+            },
+            sortBy(row) {
+                return row.data.address.zipCode;
             }
         },
         {
             name: 'City',
             render(row) {
-                return row.data.city;
-            }
+                const div = document.createElement('div');
+                div.append(row.data.city);
+                return div;
+            },
+            sortBy: 'auto'
         },
         {
             name: 'Computed',
             render(row) {
                 return `This person's name is ${row.data.name} and s/he lives in ${row.data.city}`;
-            }
+            },
+            sortBy(row) {
+                return row.data.city;
+            },
         }
     ],
     data: data,
@@ -385,7 +481,7 @@ window.x = new Table({
         ];
     },
     showSearch: true,
-    theme: 'ice'
+    theme: 'ice',
 });
 //@ts-ignore
 document.body.append(window.x.element);

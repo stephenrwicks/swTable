@@ -42,7 +42,7 @@ const icons = {
         svg.setAttribute('viewBox', '0 0 24 24');
         svg.setAttribute('width', '24');
         svg.setAttribute('height', '24');
-        svg.setAttribute('fill', 'black');
+        // svg.setAttribute('fill', 'black');
         path.setAttribute('d', 'M8.59 16.59L13.17 12L8.59 7.41L10 6L16 12L10 18L8.59 16.59Z');
         svg.append(path);
         svg.classList.add(css.icon);

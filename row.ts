@@ -11,15 +11,18 @@ class Row {
 
     #observable = new Observable();
     detailButton: HTMLButtonElement | null = null;
-    detailTd: HTMLTableCellElement | null = null;
-    checkboxTd: HTMLTableCellElement | null = null;
+    //detailTd: HTMLTableCellElement | null = null;
+    //checkboxTd: HTMLTableCellElement | null = null;
     checkbox: HTMLInputElement | null = null;
     actionsButton: HTMLButtonElement | null = null;
-    actionsTd: HTMLTableCellElement | null = null;
+    //actionsTd: HTMLTableCellElement | null = null;
+    rowId = crypto.randomUUID();
+    cells: {[key: string]: HTMLTableCellElement | null} = {
+        detailTd: null,
+        checkboxTd: null,
+        actionsTd: null
+    };
     
-    constructor() {
-        this.#tr.classList.add(css.tr);
-    }
 
     get #table() {
         return rowToTable.get(this);
@@ -30,33 +33,30 @@ class Row {
         return this.#table.rows.indexOf(this);
     }
 
-    #isRendered = false;
     render() {
-        // Render all
         if (!this.#table) return;
-        this.#isRendered = false;
         this.renderCells();
         this.renderDetail();
         this.renderCheckbox();
         this.renderActions();
-        this.#isRendered = true;
     }
 
     renderCells() {
         if (!this.#table) return;
-        //this.#tr.replaceChildren(); // Don't do this
-        // Need something like this where we ignore the auto-cells.
-        // However, this will get things out of order eventually, so I need a smarter idea
-        // Need to group stuff
-        const cells = [...this.#tr.cells].filter(cell => cell !== this.actionsTd && cell !== this.checkboxTd && cell !== this.detailTd);
-        for (const cell of cells) cell.remove();
+        this.#tr.replaceChildren();
+        if (this.cells.detailTd) this.#tr.append(this.cells.detailTd);
         for (const column of this.#table.columns) {
-            const td = document.createElement('td');
-            td.dataset.colId = column.colId;
-            td.classList.add(css.td);
-            if (column.render) td.append(column.render(this));
+            if (!(column.colId in this.cells)) {
+                const newTd = document.createElement('td');
+                this.cells[column.colId] = newTd;
+            }
+            const td = this.cells[column.colId];
+            if (!td) continue;
+            if (column.render) td.replaceChildren(column.render(this));
             this.#tr.append(td);
         }
+        if (this.cells.actionsTd) this.#tr.append(this.cells.actionsTd);
+        if (this.cells.checkboxTd) this.#tr.append(this.cells.checkboxTd);
     }
 
     renderDetail() {
@@ -73,9 +73,11 @@ class Row {
             this.#detail.render(detailContents, this.#table.colSpan);
             if (this.detailButton === null) {
                 this.detailButton = document.createElement('button');
-                this.detailButton.classList.add(css.detailButton);
+                this.detailButton.type = 'button';
+                this.detailButton.classList.add(css.button, css.detailButton);
                 this.detailButton.append(icons.chevron());
                 this.detailButton.addEventListener('click', () => this.toggleDetail());
+                this.cells.detailTd?.append(this.detailButton);
             }
         }
     }
@@ -83,8 +85,9 @@ class Row {
         if (!this.#table) return;
         if (typeof this.#table.checkboxFn === 'function' && this.#table.checkboxFn(this)) {
             this.checkbox ??= document.createElement('input');
+            this.checkbox.classList.add(css.checkbox);
             this.checkbox.type = 'checkbox';
-            this.checkboxTd?.append(this.checkbox);
+            this.cells.checkboxTd?.append(this.checkbox);
         }
         else {
             this.checkbox?.remove();
@@ -106,9 +109,11 @@ class Row {
             this.#actions.render(actionsArray);
             if (this.actionsButton === null) {
                 this.actionsButton = document.createElement('button');
-                this.actionsButton.classList.add(css.actionsButton);
+                this.actionsButton.type = 'button';
+                this.actionsButton.classList.add(css.button);
                 this.actionsButton.append(icons.ellipsis());
                 this.actionsButton.addEventListener('click', () => this.toggleActions());
+                this.cells.actionsTd?.append(this.actionsButton);
             }
             actionDivToActionButton.set(this.#actions.div, this.actionsButton);
         }
@@ -119,12 +124,12 @@ class Row {
         return this.#tr;
     }
 
-    get data() {
+    get data(): any {
         if (!this.#observable) return;
         return this.#observable.proxy;
     }
 
-    set data(data: any) {
+    set data(data) {
         this.#observable.target = data;
         this.#observable.clearCallbacks();
         this.#observable.callbacks.push(this.render.bind(this));
@@ -229,6 +234,8 @@ class Row {
     }
 
     destroy() {
+        // Need to update the page counter without re-rendering
+        this.#table?.rows.splice(this.index, 1);
         rowToTable.delete(this);
         rowToActions.delete(this);
         rowToDetail.delete(this);

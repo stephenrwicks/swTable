@@ -2,6 +2,78 @@
     width: fit-content;
     padding: 8px;
 
+    .sw-table-header {
+        display: grid;
+        grid-auto-flow: column;
+    }
+
+    /* Need > to ignore any potential nested table */
+    >table {
+        color: var(--sw-table-font-color);
+        border-collapse: collapse;
+        box-shadow: var(--sw-table-box-shadow);
+        border: 1px solid var(--sw-table-outer-border);
+
+        tbody tr {
+            border-top: 1px solid transparent;
+
+            &:hover {
+                color: var(--sw-table-font-color-hover);
+                background-color: var(--sw-table-tr-hover);
+            }
+
+            &.sw-table-detail-tr-open {
+                border-top: 1px solid var(--sw-table-inner-border);
+                border-left: 1px solid var(--sw-table-inner-border);
+                border-right: 1px solid var(--sw-table-inner-border);
+
+                .sw-table-detail-button .sw-table-icon {
+                    transform: rotate(90deg);
+                }
+            }
+
+        }
+
+        td,
+        th {
+            padding: 10px;
+            vertical-align: middle;
+        }
+
+        .sw-table-icon {
+            transition: transform .1s ease;
+            fill: var(--sw-table-font-color);
+        }
+
+        .sw-table-button {
+            all: unset;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+
+            &:hover {
+                color: var(--sw-table-icon-hover);
+                .sw-table-icon {
+                    fill: var(--sw-table-icon-hover);
+                }
+            }
+        }
+
+        .sw-table-detail-tr {
+            border-bottom: 1px solid var(--sw-table-inner-border);
+            border-left: 1px solid var(--sw-table-inner-border);
+            border-right: 1px solid var(--sw-table-inner-border);
+
+            td {
+                padding: 0px;
+            }
+
+        }
+
+    }
+
+
     /* Theme colors */
     --sw-table-mint-light: hsla(150, 40%, 85%, 0.2);
     --sw-table-mint-dark: hsla(150, 40%, 55%, 0.2);
@@ -26,7 +98,7 @@
     --sw-table-outer-border: var(--sw-table-mint-dark);
 }
 
-.sw-table[data-sw-table-theme="ice"]{
+.sw-table[data-sw-table-theme="ice"] {
     /* Ice theme */
 
     /* These themes could be abstracted an extra layer so that it is --sw-table-theme-dark etc.
@@ -43,87 +115,34 @@
     --sw-table-outer-border: var(--sw-table-ice-accent);
 }
 
-.sw-table-table {
-    color: var(--sw-table-font-color);
-    border-collapse: collapse;
-    box-shadow: var(--sw-table-box-shadow);
-    border: 1px solid var(--sw-table-outer-border);
-}
 
-.sw-table-header {
-    display: grid;
-    grid-auto-flow: column;
-}
 
-.sw-table-tr.sw-table-detail-tr-open .sw-table-detail-button .sw-table-icon {
-    transform: rotate(90deg);
-}
 
-.sw-table td,
-.sw-table th {
-    padding: 10px;
-    vertical-align: middle;
-}
-
-.sw-table-detail-td {
-    padding: 0px;
-}
-
-.sw-table-tr-even {
+/* .sw-table-tr-even {
     background-color: var(--sw-table-row-even);
 }
 
 .sw-table-tr-odd {
     background-color: var(--sw-table-row-odd);
-}
-
-.sw-table-tr:hover {
-    color: var(--sw-table-font-color-hover);
-    background-color: var(--sw-table-tr-hover);
-}
-
-.sw-table-icon {
-    transition: transform .1s ease;
-    fill: var(--sw-table-font-color);
-}
-
-.sw-table-detail-button {
-    all: unset;
-    cursor: pointer;
-}
-
-.sw-table-tr {
-    border-top: 1px solid transparent;
-}
-
-.sw-table-tr.sw-table-detail-tr-open {
-    border-top: 1px solid var(--sw-table-inner-border);
-    border-left: 1px solid var(--sw-table-inner-border);
-    border-right: 1px solid var(--sw-table-inner-border);
-}
-
-.sw-table-detail-tr {
-    border-bottom: 1px solid var(--sw-table-inner-border);
-    border-left: 1px solid var(--sw-table-inner-border);
-    border-right: 1px solid var(--sw-table-inner-border);
-}
+} */
 
 
-.sw-table-detail-button:hover svg {
-    fill: var(--sw-table-icon-hover);
-}
 
-.sw-table-search-wrapper {
+
+
+
+
+/* .sw-table-search-wrapper {
     display: grid;
     align-items: center;
     width: fit-content;
-}
+} */
 
-.sw-table-search-wrapper>svg {
+/* .sw-table-search-wrapper>svg {
     grid-area: 1/1/1/1;
 }
 
 .sw-table-search {
     grid-area: 1/1/1/1;
     padding-left: 25px;
-}
+} */

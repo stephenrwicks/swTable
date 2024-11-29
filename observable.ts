@@ -11,10 +11,11 @@ class Observable<T extends object> {
         const handler: ProxyHandler<any> = {
             get: (target, property, receiver) => {
                 const value = Reflect.get(target, property, receiver);
-                // Check the behavior of dates, etc.
-                if (typeof value === 'object' && value !== null) {
-                    return this.createNestedProxy(value, [...path, property]);
-                }
+                if (value === null || typeof value === 'undefined') return value;
+                // Returns nested proxy of generic objects and arrays, but not Dates or custom classes, etc.
+                if (Object.getPrototypeOf(value) === Object.prototype) return this.createNestedProxy(value, [...path, property]);
+                if (Object.getPrototypeOf(value) === null) return this.createNestedProxy(value, [...path, property]);
+                if (Array.isArray(value)) return this.createNestedProxy(value, [...path, property]);
                 return value;
             },
             set: (target, property, value, receiver) => {
