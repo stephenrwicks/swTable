@@ -59,10 +59,6 @@ class Observable<T extends object> {
         this.#callbacks = callbacks;
     }
 
-    clearCallbacks() {
-        this.#callbacks = [];
-    }
-
     destroy() {
         this.#callbacks = null as any;
         this.#proxy = null as any;

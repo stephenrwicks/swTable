@@ -1,6 +1,5 @@
 export { css };
 const css = {
-    wrapper: 'sw-table',
     header: 'sw-table-header',
     detailTr: 'sw-table-detail-tr',
     checkbox: 'sw-table-checkbox',

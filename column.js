@@ -22,6 +22,19 @@ class Column {
             settings.sortBy = 'auto';
         this.sortBy = settings.sortBy;
         this.name = settings.name ?? '';
+        this.th.draggable = true;
+        // this.th.addEventListener('dragstart', (e) => {
+        //     console.log(e);
+        //     const dragImage = document.createElement('div');
+        //     //dragImage.style.pointerEvents = 'none'; // Prevent interactions
+        //     dragImage.style.height = '1px';
+        //     dragImage.style.width= '1px';
+        //     document.body.append(dragImage);
+        //     // Use the custom element as the drag image
+        //     e.dataTransfer.setDragImage(dragImage, 0, 0);
+        //     // Clean up after drag ends
+        //     setTimeout(() => document.body.removeChild(dragImage), 0);
+        // });
     }
     addHoverEffect(color) {
         this.th.addEventListener('mouseover', () => {
@@ -85,16 +98,44 @@ class Column {
             return null;
         return this.#table.rowsCurrentPage.map(row => row.cells[this.colId]);
     }
-    moveTo(i) {
-        if (!this.#table)
+    moveTo(index) {
+        const table = this.#table;
+        if (!table)
+            throw new Error('SwTable - column moveTo');
+        if (typeof index !== 'number')
+            throw new Error('SwTable - column moveTo');
+        if (index < 0)
+            index = 0;
+        if (index > table.columns.length - 1)
+            index = table.columns.length - 1;
+        if (this.sortOrder === index)
             return;
-        const x = this.#table.columns.find(col => col.sortOrder === i);
-        if (x)
-            x.sortOrder--;
-        this.sortOrder = i;
-        this.#table.renderColumnTr();
-        for (const row of this.#table.rows)
+        table.columns.forEach((col, i) => {
+            col.sortOrder = i;
+        });
+        if (this.sortOrder < index) { // Moving forward
+            for (const col of table.columns) {
+                if (col.sortOrder > index)
+                    col.sortOrder++;
+                else
+                    col.sortOrder--;
+            }
+        }
+        else { // Moving backward
+            for (const col of table.columns) {
+                if (col.sortOrder < index)
+                    col.sortOrder--;
+                else
+                    col.sortOrder++;
+            }
+        }
+        this.sortOrder = index;
+        table.renderColumnTr();
+        for (const row of table.rows)
             row.render();
+        for (const column of table.columns) {
+            console.log(column.sortOrder);
+        }
     }
     destroy() {
         if (!this.#table)
@@ -180,6 +221,9 @@ class BuiltInColumn {
     }
 }
 class CheckboxColumn extends BuiltInColumn {
+    // Select all must determine whether to show,
+    // and whether to be checked / indeterminate
+    // Only shows when rowsFilterTrue has a checkbox
     selectAllCheckbox = document.createElement('input');
     constructor() {
         super('checkbox');

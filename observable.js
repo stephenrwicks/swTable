@@ -55,9 +55,6 @@ class Observable {
     set callbacks(callbacks) {
         this.#callbacks = callbacks;
     }
-    clearCallbacks() {
-        this.#callbacks = [];
-    }
     destroy() {
         this.#callbacks = null;
         this.#proxy = null;

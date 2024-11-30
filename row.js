@@ -3,13 +3,11 @@ import { Detail } from './detail.js';
 import { Actions } from './actions.js';
 import { icons } from './icons.js';
 import { Observable } from './observable.js';
-import { rowToTable, rowToDetail, rowToActions, actionDivToActionButton } from './weakMaps.js';
+import { rowToTable, actionsToRow } from './weakMaps.js';
 export { Row };
 class Row {
     #observable = new Observable();
     detailButton = null;
-    checkbox = null;
-    actionsButton = null;
     rowId = crypto.randomUUID();
     cells = {
         detail: null,
@@ -27,6 +25,7 @@ class Row {
     render() {
         if (!this.#table)
             return;
+        // The focused element is being completely re-rendered 
         this.#tr.replaceChildren();
         if (this.#table.columnsObject.detail) {
             this.cells.detail ??= document.createElement('td');
@@ -34,13 +33,16 @@ class Row {
             this.#tr.append(this.cells.detail);
         }
         for (const column of this.#table.columns) {
+            // const focusEl = document.querySelector(':focus');
             if (!(column.colId in this.cells))
                 this.cells[column.colId] = document.createElement('td');
             const td = this.cells[column.colId];
             if (!td)
-                throw new Error('SwTable row renderCells');
+                throw new Error('SwTable row render');
             if (column.render)
                 td.replaceChildren(column.render(this));
+            // Somehow detect if the new re-rendered element in this cell is the same as the one that was focused
+            // Losing focus is a huge challenge since there's no diffing 
             this.#tr.append(td);
         }
         if (this.#table.columnsObject.actions) {
@@ -54,20 +56,21 @@ class Row {
             this.#tr.append(this.cells.checkbox);
         }
     }
+    detail = null;
     // These are rendering the contents, not the cells
     renderDetail() {
         if (!this.#table)
             return;
         const detailContents = this.#table.detailFn ? this.#table.detailFn(this) : null;
         if (detailContents === null) {
-            this.#detail?.tr.remove();
-            this.#detail = null;
+            this.detail?.tr.remove();
+            this.detail = null;
             this.detailButton?.remove();
             this.detailButton = null;
         }
         else {
-            this.#detail ??= new Detail();
-            this.#detail.render(detailContents, this.#table.colSpan);
+            this.detail ??= new Detail();
+            this.detail.render(detailContents, this.#table.colSpan);
             if (this.detailButton === null) {
                 this.detailButton = document.createElement('button');
                 this.detailButton.type = 'button';
@@ -78,6 +81,7 @@ class Row {
             }
         }
     }
+    checkbox = null;
     renderCheckbox() {
         if (!this.#table)
             return;
@@ -92,30 +96,34 @@ class Row {
             this.checkbox = null;
         }
     }
+    #actions = null;
+    actionsButton = null;
     renderActions() {
         if (!this.#table)
             return;
         const actionsArray = this.#table.actionsFn ? this.#table.actionsFn(this) : null;
         if (actionsArray === null) {
-            if (this.#actions)
-                actionDivToActionButton.delete(this.#actions.div);
             this.#actions?.div.remove();
+            if (this.#actions)
+                actionsToRow.delete(this.#actions);
             this.#actions = null;
             this.actionsButton?.remove();
             this.actionsButton = null;
         }
         else {
+            if (!Array.isArray(actionsArray))
+                throw new Error('swTable - Actions have to be an array.');
             this.#actions ??= new Actions();
+            actionsToRow.set(this.#actions, this);
             this.#actions.render(actionsArray);
             if (this.actionsButton === null) {
                 this.actionsButton = document.createElement('button');
                 this.actionsButton.type = 'button';
-                this.actionsButton.classList.add(css.button);
+                this.actionsButton.classList.add(css.button, 'sw-table-actions-button');
                 this.actionsButton.append(icons.ellipsis());
                 this.actionsButton.addEventListener('click', () => this.toggleActions());
                 this.cells.actions?.append(this.actionsButton);
             }
-            actionDivToActionButton.set(this.#actions.div, this.actionsButton);
         }
     }
     #tr = document.createElement('tr');
@@ -129,7 +137,7 @@ class Row {
     }
     set data(data) {
         this.#observable.target = data;
-        this.#observable.clearCallbacks();
+        this.#observable.callbacks = [];
         this.#observable.callbacks.push(this.render.bind(this));
         this.render();
     }
@@ -149,8 +157,8 @@ class Row {
         if (!text)
             return true;
         let els = [...this.tr.querySelectorAll('*:not(.sw-table-search-ignore *)')];
-        if (this.#detail?.tr)
-            els = [...els, ...this.#detail.tr.querySelectorAll('*:not(.sw-table-search-ignore *)')];
+        if (this.detail?.tr)
+            els = [...els, ...this.detail.tr.querySelectorAll('*:not(.sw-table-search-ignore *)')];
         return els.map(el => [...el.childNodes]
             .filter(n => n.nodeType === Node.TEXT_NODE)
             .map(n => n.textContent).join(' ')
@@ -167,43 +175,21 @@ class Row {
             return true;
         return this.#table.filters.every(fn => fn(this));
     }
-    get #detail() {
-        return rowToDetail.get(this) ?? null;
-    }
-    set #detail(instance) {
-        if (instance instanceof Detail) {
-            rowToDetail.set(this, instance);
-        }
-        else {
-            rowToDetail.delete(this);
-        }
-    }
-    get #actions() {
-        return rowToActions.get(this) ?? null;
-    }
-    set #actions(instance) {
-        if (instance instanceof Actions) {
-            rowToActions.set(this, instance);
-        }
-        else {
-            rowToActions.delete(this);
-        }
-    }
-    #detailIsVisible = false;
+    detailIsVisible = false;
     showDetail() {
-        if (!this.#detail || this.#detailIsVisible)
+        if (!this.detail || this.detailIsVisible)
             return;
-        this.tr.after(this.#detail.tr);
-        this.#detailIsVisible = true;
+        this.tr.after(this.detail.tr);
+        this.detailIsVisible = true;
     }
     hideDetail() {
-        if (!this.#detail || !this.#detailIsVisible)
+        if (!this.detail || !this.detailIsVisible)
             return;
-        this.#detail.tr.remove();
-        this.#detailIsVisible = false;
+        this.detail.tr.remove();
+        this.detailIsVisible = false;
     }
     toggleDetail() {
-        this.#detailIsVisible ? this.hideDetail() : this.showDetail();
+        this.detailIsVisible ? this.hideDetail() : this.showDetail();
     }
     // Could make this a method instead
     get isChecked() {
@@ -215,29 +201,41 @@ class Row {
         if (!this.checkbox)
             return;
         this.checkbox.checked = !!bool;
+        this.tr.dataset.isChecked = String(!!bool);
     }
     #actionsAreOpen = false;
     showActions() {
-        if (!this.#actions || this.#actionsAreOpen)
+        if (!this.#actions || this.#actionsAreOpen || !this.actionsButton || !this.cells.actions)
             return;
-        this.tr.classList.add('sw-table-tr-actions-open');
+        this.cells.actions.append(this.#actions.div);
+        document.addEventListener('click', this.#dismissActionsEvent);
         this.#actionsAreOpen = true;
     }
     hideActions() {
         if (!this.#actions || !this.#actionsAreOpen)
             return;
-        this.tr.classList.remove('sw-table-tr-actions-open');
         this.#actionsAreOpen = false;
+        this.#actions.div.remove();
+        document.removeEventListener('click', this.#dismissActionsEvent);
     }
     toggleActions() {
         this.#actionsAreOpen ? this.hideActions() : this.showActions();
     }
+    #dismissActionsEvent = (e) => {
+        // Arrow function maintains "this" context
+        if (this.cells.actions && this.cells.actions.contains(e.target))
+            return;
+        this.hideActions();
+    };
     destroy() {
         // Need to update the page counter without re-rendering
         this.#table?.rows.splice(this.index, 1);
+        this.detail = null;
+        this.checkbox = null;
+        if (this.#actions)
+            actionsToRow.delete(this.#actions);
+        this.#actions = null;
         rowToTable.delete(this);
-        rowToActions.delete(this);
-        rowToDetail.delete(this);
         this.#tr.remove();
         this.#tr = null;
         this.#observable.destroy();

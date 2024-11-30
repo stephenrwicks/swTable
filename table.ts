@@ -2,8 +2,9 @@
 import { Column, ColumnSettings, BuiltInColumn, CheckboxColumn } from './column.js';
 import { css } from './css.js';
 import { Row } from './row.js';
-import { rowToTable, columnToTable, rowToDetail } from './weakMaps.js';
+import { rowToTable, columnToTable } from './weakMaps.js';
 import { ActionSettings } from './actions.js';
+import { icons } from './icons.js';
 export { Table };
 
 type TableSettings = {
@@ -12,9 +13,9 @@ type TableSettings = {
     data?: Array<any>;
     showSearch?: boolean;
     pageLength?: number;
-    detailFn?(row: Row): Element | string | null;
-    checkboxFn?(row: Row): boolean;
-    actionsFn?(row: Row): ActionSettings;
+    detailFn?(row: Row): HTMLElement | string | null;
+    checkboxFn?(row: Row): boolean | null;
+    actionsFn?(row: Row): ActionSettings | null;
 }
 
 class Table {
@@ -54,9 +55,10 @@ class Table {
                 this.insertRow(datum);
             }
         }
-
+        settings.showSearch ??= true;
         this.showSearch = !!settings.showSearch;
         const headerTr = document.createElement('tr');
+        //this.#headerTd.classList.add('sw-table-header-td');
         this.#headerTd.append(this.#headerDiv);
         headerTr.append(this.#headerTd);
         this.#headerTd.colSpan = 999;
@@ -94,36 +96,37 @@ class Table {
     }
 
     #showSearch = false;
+    searchInput: HTMLInputElement | null = null;
     get showSearch() {
         return this.#showSearch;
     }
     set showSearch(bool: boolean) {
+        bool = !!bool;
+        if (!this.#showSearch && bool) {
+            const searchWrapper = document.createElement('div');
+            searchWrapper.classList.add('sw-table-search-wrapper');
+            const searchIcon = icons.magnifyingGlass();
+            this.searchInput ??= document.createElement('input');
+            this.searchInput.type = 'text';
+            this.searchInput.classList.add('sw-table-search');
+            this.searchInput.addEventListener('input', () => this.goToPage(1));
+            searchWrapper.append(searchIcon, this.searchInput);
+            this.#headerDiv.append(searchWrapper);
+        }
+        else if (this.#showSearch && !bool) {
+            this.searchInput?.parentElement?.remove();
+            this.searchInput?.remove();
+            this.searchInput = null;
+        }
         this.#showSearch = !!bool;
-        if (this.#showSearch) {
-            if (this.#searchInput === null) {
-                this.#searchInput ??= document.createElement('input');
-                this.#searchInput.type = 'text';
-                this.#searchInput.classList.add(css.searchInput);
-                this.#searchInput.addEventListener('input', () => this.goToPage(1));
-            }
-            this.#headerDiv.append(this.#searchInput);
-        }
-        else {
-            this.#searchInput?.remove();
-            this.#searchInput = null;
-        }
     }
 
-    #searchInput: HTMLInputElement | null = null;
-    get searchInput() {
-        if (!this.#showSearch) return null;
-        return this.#searchInput;
-    }
+
 
     get columns() {
         return Object.values(this.columnsObject)
-        .filter(column => column instanceof Column)
-        .sort((a, b) => a.sortOrder - b.sortOrder);
+            .filter(column => column instanceof Column)
+            .sort((a, b) => a.sortOrder - b.sortOrder);
     }
 
     insertColumn(settings: ColumnSettings, index: number) {
@@ -291,22 +294,15 @@ class Table {
         if (n > this.numberOfPages) n = this.numberOfPages;
         this.#tbody.replaceChildren();
         this.#currentPage = n;
-        const rowsCurrentPage = this.rowsCurrentPage;
-        rowsCurrentPage.forEach((row, i) => {
-            //if (!row.isRendered) row.render();
-            // row.tr.classList.remove('sw-table-tr-even');
-            // row.tr.classList.remove('sw-table-tr-odd');
-            // row.tr.classList.add(i % 2 === 0 ? 'sw-table-tr-even' : 'sw-table-tr-odd');
+        const rowsToShow = this.rowsCurrentPage;
+        rowsToShow.forEach((row, i) => {
+            row.tr.className = i % 2 === 1 ? 'sw-table-tr-odd' : '';
             this.#tbody.append(row.tr);
-            const detail = rowToDetail.get(row);
-            // if (detail) { 
-            //     // We can't determine if detail is open yet
-            //     this.#tbody.append(detail.tr);
-            // }
+            if (row.detail && row.detailIsVisible) this.#tbody.append(row.detail.tr);
         });
 
-        const first = this.rows.indexOf(rowsCurrentPage[0]) + 1;
-        const last = this.rows.indexOf(rowsCurrentPage[rowsCurrentPage.length - 1]) + 1;
+        const first = this.rows.indexOf(rowsToShow[0]) + 1;
+        const last = this.rows.indexOf(rowsToShow[rowsToShow.length - 1]) + 1;
         this.#tfootTd.colSpan = this.colSpan;
         this.#tfootTd.textContent = `Showing ${first}-${last} of ${this.#rows.length}`;
     }
@@ -393,52 +389,52 @@ class Table {
 
 const data = [
     {
-      id: 1,
-      revenue: 1200.50,
-      expenses: 450.75,
-      details: {
-        category: "Retail",
-        region: "North"
-      }
+        id: 1,
+        revenue: 1200.50,
+        expenses: 450.75,
+        details: {
+            category: "Retail",
+            region: "North"
+        }
     },
     {
-      id: 2,
-      revenue: 980.00,
-      expenses: 300.50,
-      details: {
-        category: "Wholesale",
-        region: "West"
-      }
+        id: 2,
+        revenue: 980.00,
+        expenses: 300.50,
+        details: {
+            category: "Wholesale",
+            region: "West"
+        }
     },
     {
-      id: 3,
-      revenue: 1500.75,
-      expenses: 700.25,
-      details: {
-        category: "Online",
-        region: "East"
-      }
+        id: 3,
+        revenue: 1500.75,
+        expenses: 700.25,
+        details: {
+            category: "Online",
+            region: "East"
+        }
     },
     {
-      id: 4,
-      revenue: 2000.00,
-      expenses: 1200.00,
-      details: {
-        category: "Corporate",
-        region: "South"
-      }
+        id: 4,
+        revenue: 2000.00,
+        expenses: 1200.00,
+        details: {
+            category: "Corporate",
+            region: "South"
+        }
     },
     {
-      id: 5,
-      revenue: 850.25,
-      expenses: 400.50,
-      details: {
-        category: "Retail",
-        region: "Central"
-      }
+        id: 5,
+        revenue: 850.25,
+        expenses: 400.50,
+        details: {
+            category: "Retail",
+            region: "Central"
+        }
     }
-  ];
-  
+];
+
 //@ts-ignore
 window.x = new Table({
     pageLength: 10,
@@ -452,19 +448,20 @@ window.x = new Table({
         {
             name: 'Revenue',
             render(row) {
-                return row.data.revenue.toLocaleString('en-US', { style: 'currency', currency: 'USD' });;
+                return row.data.revenue.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
             }
         },
         {
             name: 'Expenses',
             render(row) {
-                return row.data.expenses.toLocaleString('en-US', { style: 'currency', currency: 'USD' });;
-            }
+                return row.data.expenses.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+            },
+            sortBy: null
         },
         {
             name: 'Net',
             render(row) {
-                return (row.data.revenue - row.data.expenses).toLocaleString('en-US', { style: 'currency', currency: 'USD' });;
+                return (row.data.revenue - row.data.expenses).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
             }
         },
     ],
@@ -472,20 +469,65 @@ window.x = new Table({
     detailFn(row) {
         return 'x';
     },
-    // checkboxFn(row) {
-    //     return false;
-    // },
+    checkboxFn(row) {
+        return null;
+    },
     actionsFn(row) {
         return [
             {
-                text: 'aaa',
+                text: 'Set Revenue',
                 fn() {
-                    alert('x');
+                   row.data.revenue = Number(prompt('Revenue was:'));
                 }
             }
         ]
     },
     showSearch: true,
+    theme: 'ice',
+});
+//@ts-ignore
+
+// Seems like every time data changes, you should re-sort and re-filter
+window.q = new Table({
+    pageLength: 10,
+    columns: [
+        {
+            name: 'count',
+            render(row) {
+                return row.data.count;
+            }
+        },
+        {
+            name: 'button',
+            render(row) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = `Increase count: ${row.data.count}`;
+                btn.addEventListener('click', () => row.data.count++);
+                return btn;
+            }
+        },
+        {
+            name: 'button',
+            render(row) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = `Increase count by 10: ${row.data.count}`;
+                btn.addEventListener('click', () => row.data.count = row.data.count + 10);
+                return btn;
+            }
+        },
+
+    ],
+    data: [
+        {
+            count: 1
+        },
+        {
+            count: 100
+        }
+    ],
+    // showSearch: true,
     theme: 'ice',
 });
 //@ts-ignore
