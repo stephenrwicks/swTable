@@ -7,7 +7,6 @@ const css = {
     button: 'sw-table-button',
     detailButton: 'sw-table-detail-button',
     icon: 'sw-table-icon',
-    detailIsOpen: 'sw-table-detail-tr-open',
     searchInputWrapper: 'sw-table-search-wrapper',
     searchInput: 'sw-table-search',
     searchIgnore: 'sw-table-search-ignore',

@@ -11,16 +11,13 @@ class Row {
 
     #observable = new Observable();
     detailButton: HTMLButtonElement | null = null;
-    //detailTd: HTMLTableCellElement | null = null;
-    //checkboxTd: HTMLTableCellElement | null = null;
     checkbox: HTMLInputElement | null = null;
     actionsButton: HTMLButtonElement | null = null;
-    //actionsTd: HTMLTableCellElement | null = null;
     rowId = crypto.randomUUID();
     cells: {[key: string]: HTMLTableCellElement | null} = {
-        detailTd: null,
-        checkboxTd: null,
-        actionsTd: null
+        detail: null,
+        checkbox: null,
+        actions: null
     };
     
 
@@ -35,30 +32,32 @@ class Row {
 
     render() {
         if (!this.#table) return;
-        this.renderCells();
-        this.renderDetail();
-        this.renderCheckbox();
-        this.renderActions();
-    }
-
-    renderCells() {
-        if (!this.#table) return;
         this.#tr.replaceChildren();
-        if (this.cells.detailTd) this.#tr.append(this.cells.detailTd);
+        if (this.#table.columnsObject.detail) {
+            this.cells.detail ??= document.createElement('td');
+            this.renderDetail();
+            this.#tr.append(this.cells.detail);
+        }
         for (const column of this.#table.columns) {
-            if (!(column.colId in this.cells)) {
-                const newTd = document.createElement('td');
-                this.cells[column.colId] = newTd;
-            }
+            if (!(column.colId in this.cells)) this.cells[column.colId] = document.createElement('td');
             const td = this.cells[column.colId];
-            if (!td) continue;
+            if (!td) throw new Error('SwTable row renderCells')
             if (column.render) td.replaceChildren(column.render(this));
             this.#tr.append(td);
         }
-        if (this.cells.actionsTd) this.#tr.append(this.cells.actionsTd);
-        if (this.cells.checkboxTd) this.#tr.append(this.cells.checkboxTd);
+        if (this.#table.columnsObject.actions) {
+            this.cells.actions ??= document.createElement('td');
+            this.renderActions();
+            this.#tr.append(this.cells.actions);
+        }
+        if (this.#table.columnsObject.checkbox) {
+            this.cells.checkbox ??= document.createElement('td');
+            this.renderCheckbox();
+            this.#tr.append(this.cells.checkbox);
+        }
     }
 
+    // These are rendering the contents, not the cells
     renderDetail() {
         if (!this.#table) return;
         const detailContents = this.#table.detailFn ? this.#table.detailFn(this) : null;
@@ -77,7 +76,7 @@ class Row {
                 this.detailButton.classList.add(css.button, css.detailButton);
                 this.detailButton.append(icons.chevron());
                 this.detailButton.addEventListener('click', () => this.toggleDetail());
-                this.cells.detailTd?.append(this.detailButton);
+                this.cells.detail?.append(this.detailButton);
             }
         }
     }
@@ -87,7 +86,7 @@ class Row {
             this.checkbox ??= document.createElement('input');
             this.checkbox.classList.add(css.checkbox);
             this.checkbox.type = 'checkbox';
-            this.cells.checkboxTd?.append(this.checkbox);
+            this.cells.checkbox?.append(this.checkbox);
         }
         else {
             this.checkbox?.remove();
@@ -113,7 +112,7 @@ class Row {
                 this.actionsButton.classList.add(css.button);
                 this.actionsButton.append(icons.ellipsis());
                 this.actionsButton.addEventListener('click', () => this.toggleActions());
-                this.cells.actionsTd?.append(this.actionsButton);
+                this.cells.actions?.append(this.actionsButton);
             }
             actionDivToActionButton.set(this.#actions.div, this.actionsButton);
         }
@@ -143,7 +142,6 @@ class Row {
     get dataSnapshot() {
         return structuredClone(this.#observable.target);
     }
-
 
     get isSearchMatch(): boolean {
         if (!this.#table) return false;
@@ -197,13 +195,11 @@ class Row {
     showDetail() {
         if (!this.#detail || this.#detailIsVisible) return;
         this.tr.after(this.#detail.tr);
-        this.tr.classList.add(css.detailIsOpen);
         this.#detailIsVisible = true;
     }
     hideDetail() {
         if (!this.#detail || !this.#detailIsVisible) return;
         this.#detail.tr.remove();
-        this.tr.classList.remove(css.detailIsOpen);
         this.#detailIsVisible = false;
     }
     toggleDetail() {

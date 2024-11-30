@@ -12,7 +12,8 @@ class Detail {
     }
 
     render(contents: Element | string, colSpan: number) {
-        this.#td.colSpan = colSpan;
+        this.#td.colSpan = colSpan; 
+        // colSpan will get messed up. Best really might just be to set to 999
         this.#td.replaceChildren(contents);
     }
 

@@ -2,7 +2,7 @@ import { css } from './css.js';
 import { icons } from './icons.js';
 import { Row } from './row.js';
 import { columnToTable } from './weakMaps.js';
-export { Column, ColumnSettings, BuiltInColumn };
+export { Column, ColumnSettings, BuiltInColumn, CheckboxColumn };
 type ColumnSettings = {
     render: (row: Row) => Element | string;
     name?: string;
@@ -16,6 +16,7 @@ class Column {
 
     th = document.createElement('th');
     colId = crypto.randomUUID();
+    sortOrder = -1;
 
     constructor(settings: ColumnSettings) {
         const thButton = document.createElement('button');
@@ -25,32 +26,49 @@ class Column {
         thButton.classList.add(css.button);
         thButton.append(span, chevron);
         this.th.append(thButton);
-        this.isReactive = typeof settings.isReactive === 'boolean' ? settings.isReactive : true;
+        this.th.dataset.isAscending = 'false';
+        this.th.dataset.isCurrentSort = 'false';
+        //this.isReactive = typeof settings.isReactive === 'boolean' ? settings.isReactive : true;
         this.#render = typeof settings.render === 'function' ? settings.render : null;
         if (typeof settings.sortBy === 'undefined') settings.sortBy = 'auto';
         this.sortBy = settings.sortBy;
-        //this.th.classList.add(css.th);
-        //this.th.dataset.uuid = this.colId;
         this.name = settings.name ?? '';
+
     }
 
-    #isReactive = true;
-    get isReactive() {
-        return this.#isReactive;
+    addHoverEffect(color: string) {
+        this.th.addEventListener('mouseover', () => {
+            this.th.style.backgroundColor = color;
+            for (const cell of this.cellsCurrentPage ?? []) cell.style.backgroundColor = color;
+        });
+        this.th.addEventListener('mouseout', () => {
+            this.th.style.backgroundColor = '';
+            for (const cell of this.cellsCurrentPage ?? []) cell.style.backgroundColor = '';
+        });
     }
 
-    set isReactive(bool: boolean) {
-        this.#isReactive = !!bool;
-    }
+    // #isReactive = true;
+    // get isReactive() {
+    //     return this.#isReactive;
+    // }
+
+    // set isReactive(bool: boolean) {
+    //     this.#isReactive = !!bool;
+    // }
 
     get #table() {
         return columnToTable.get(this);
     }
 
-    get index() {
-        if (!this.#table) return -1;
-        return this.#table.columns.indexOf(this);
-    }
+    // get index() {
+    //     if (!this.#table) return -1;
+    //     return this.#table.columns.indexOf(this);
+    // }
+
+    // get i() {
+    //     if (!this.#table) return -1;
+    //     return [...this.#table.element.querySelectorAll('thead tr th')].indexOf(this.th);
+    // }
 
     #render: ColumnSettings['render'] | null;
     get render() {
@@ -63,7 +81,7 @@ class Column {
 
         for (const row of table.rows) {
             // Probably a cheaper way to do this
-            row.renderCells();
+            row.render();
         }
     }
 
@@ -83,21 +101,24 @@ class Column {
 
     get cellsCurrentPage() {
         if (!this.#table) return null;
-        return this.#table.rowsCurrentPage.map(row => row.tr.querySelector(`td[data-col-id="${this.colId}"`)) as Array<HTMLTableCellElement>;
+        return this.#table.rowsCurrentPage.map(row => row.cells[this.colId]) as Array<HTMLTableCellElement>;
     }
 
-    moveTo(index: number) {
+    moveTo(i: number) {
         if (!this.#table) return;
-        this.#table.columns.splice(this.#table.columns.indexOf(this), 1);
-        this.#table.columns.splice(index, 0, this);
-
+        const x = this.#table.columns.find(col => col.sortOrder === i);
+        if (x) x.sortOrder--;
+        this.sortOrder = i;
+        this.#table.renderColumnTr();
+        for (const row of this.#table.rows) row.render();
     }
 
     destroy() {
+        if (!this.#table) return;
         for (const td of this.cells ?? []) {
-            console.log(td);
             td.remove();
         }
+        this.#table.columnsObject[this.colId] = null;
         columnToTable.delete(this);
         this.th.remove();
         this.th = null as any;
@@ -108,50 +129,50 @@ class Column {
         return this.#sortBy;
     }
     set sortBy(fn: ColumnSettings['sortBy'] | null) {
-        if (fn === 'auto' || typeof fn === 'function') {
+        const isSortable = typeof fn === 'function' || fn === 'auto';
+        if (isSortable) {
             this.#sortBy = fn;
         }
         else {
             this.#sortBy = null;
         }
         // Re-sort if we are already sorted by this column
-        this.th.querySelector('button')!.onclick = typeof this.#sortBy === 'function' || this.#sortBy === 'auto' ? () => this.sort() : null;
-        this.th.dataset.sort = typeof this.#sortBy === 'function' || this.#sortBy === 'auto' ? 'true' : 'false';
+        this.th.querySelector('button')!.onclick = isSortable ? () => this.sort() : null;
+        this.th.querySelector('button')!.disabled = !isSortable;
+        this.th.dataset.isSortable = String(isSortable);
     }
 
-    #isCurrentlySortedByThisColumn = false;
     #isAscending = false;
+    #isCurrentSort = false;
     sort(ascending: boolean = !this.#isAscending) {
         if (!this.#sortBy) return;
         if (!this.#table) return;
+        for (const column of this.#table.columns) {
+            column.#isCurrentSort = false;
+            column.#isAscending = false;
+            column.th.dataset.isAscending = 'false';
+            column.th.dataset.isCurrentSort = 'false';
+        }
         this.#table.rows.sort((a, b) => {
             if (this.#sortBy === 'auto') {
                 // Automatically sort by the render function
                 if (!this.#render) throw new Error('swTable - auto sorting');
                 let aVal = this.#render!(a);
                 let bVal = this.#render!(b);
-                if (typeof aVal !== 'object' && typeof bVal !== 'object') {
-                    aVal = String(aVal);
-                    bVal = String(bVal);
-                    return !!ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-                }
-                if (aVal instanceof HTMLElement && bVal instanceof HTMLElement) {
-                    // Render returns element not htmlelement
-                    aVal = aVal.innerText;
-                    bVal = bVal.innerText;
-                    return !!ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-                }
-                throw new Error('swTable - auto sorting');
+                // Convert element or number to string
+                aVal = aVal instanceof HTMLElement ? aVal.innerText : String(aVal);
+                bVal = bVal instanceof HTMLElement ? bVal.innerText : String(bVal);
+                return !!ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
             }
             // Sort by custom parameter
             const aVal = String(this.#sortBy!(a));
             const bVal = String(this.#sortBy!(b));
             return !!ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
         });
-        // Need to say is currently sorted by this and undo all others
-        // this.#isCurrentlySortedByThisColumn = true;
-        // undo all others - public property?? this.table.sortCol = this?
         this.#isAscending = !!ascending;
+        this.#isCurrentSort = true;
+        this.th.dataset.isAscending = String(this.#isAscending);
+        this.th.dataset.isCurrentSort = String(this.#isCurrentSort);
         this.#table.goToPage(1);
     }
 }
@@ -159,13 +180,27 @@ class Column {
 class BuiltInColumn {
     th = document.createElement('th');
     colId: string;
-
     constructor(type: 'detail' | 'actions' | 'checkbox') {
         this.colId = type;
-
     }
-
     get #table() {
         return columnToTable.get(this);
+    }
+    destroy() {
+        if (!this.#table) return;
+        this.#table.columnsObject[this.colId] = null;
+        columnToTable.delete(this);
+        this.th = null as any;
+        // this.#renderTheadTr();
+    }
+}
+
+class CheckboxColumn extends BuiltInColumn {
+    selectAllCheckbox = document.createElement('input');
+    constructor() {
+        super('checkbox');
+        this.selectAllCheckbox.type = 'checkbox';
+        this.selectAllCheckbox.classList.add(css.checkbox);
+        this.th.append(this.selectAllCheckbox);
     }
 }

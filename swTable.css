@@ -1,130 +1,170 @@
 .sw-table {
     width: fit-content;
+    border-collapse: collapse;
     padding: 8px;
+    font: var(--font);
+    color: var(--fontColor);
+    box-shadow: var(--boxShadow);
+
+
+    border: 1px solid var(--outerBorderColor);
 
     .sw-table-header {
-        display: grid;
-        grid-auto-flow: column;
+        display: flex;
+        /* grid-auto-flow: column; */
+        height: 3rem;
     }
 
-    /* Need > to ignore any potential nested table */
-    >table {
-        color: var(--sw-table-font-color);
-        border-collapse: collapse;
-        box-shadow: var(--sw-table-box-shadow);
-        border: 1px solid var(--sw-table-outer-border);
 
-        tbody tr {
-            border-top: 1px solid transparent;
 
-            &:hover {
-                color: var(--sw-table-font-color-hover);
-                background-color: var(--sw-table-tr-hover);
-            }
 
-            &.sw-table-detail-tr-open {
-                border-top: 1px solid var(--sw-table-inner-border);
-                border-left: 1px solid var(--sw-table-inner-border);
-                border-right: 1px solid var(--sw-table-inner-border);
+    td {
+        padding: 10px;
+        vertical-align: middle;
+    }
 
-                .sw-table-detail-button .sw-table-icon {
-                    transform: rotate(90deg);
-                }
-            }
+    th {
+        padding: 0px;
+        vertical-align: middle;
+    }
 
+    thead tr {
+        background-color: var(--theadBackgroundColor);
+    }
+
+    tfoot tr {
+        background-color: var(--tfootBackgroundColor);
+        border-top: 1px solid var(--innerBorderColor);
+    }
+
+    tbody tr {
+
+        border-top: 1px solid var(--innerBorderColor);
+        background-color: var(--rowBackgroundColor);
+
+        &:not(.sw-table-detail-tr):hover {
+            color: var(--rowHoverFontColor);
+            background-color: var(--rowHoverBackgroundColor);
         }
 
-        td,
-        th {
+        &:has(+.sw-table-detail-tr) {
+            border-top: 1px solid var(--innerBorderColor);
+            border-left: 1px solid var(--innerBorderColor);
+            border-right: 1px solid var(--innerBorderColor);
+
+            .sw-table-detail-button .sw-table-icon {
+                rotate: 90deg;
+            }
+        }
+
+    }
+
+    .sw-table-icon {
+        fill: var(--fontColor);
+        scale: 1.4;
+    }
+
+    .sw-table-button {
+        all: unset;
+        user-select: none;
+        display: flex;
+        gap: 5px;
+        padding: 10px;
+        align-items: center;
+        cursor: pointer;
+
+        &:focus-visible {
+            outline: 1px solid var(--buttonFocusColor);
+        }
+
+        &:hover {
+            color: var(--iconHover);
+
+            .sw-table-icon {
+                fill: var(--iconHover);
+            }
+        }
+    }
+
+    .sw-table-checkbox {
+        cursor: pointer;
+        scale: 1.4;
+        accent-color: var(--checkboxColor)
+    }
+
+    th .sw-table-icon {
+        visibility: hidden;
+        scale: 1.2;
+    }
+
+    th[data-is-current-sort="true"] .sw-table-icon {
+        visibility: visible;
+    }
+
+    th[data-is-ascending="true"] .sw-table-icon {
+        rotate: -90deg;
+    }
+
+    th[data-is-ascending="false"] .sw-table-icon {
+        rotate: 90deg;
+    }
+
+    .sw-table-detail-tr {
+        border-bottom: 1px solid var(--innerBorderColor);
+        border-left: 1px solid var(--innerBorderColor);
+        border-right: 1px solid var(--innerBorderColor);
+
+        td {
+            background-color: var(--detailBackgroundColor);
             padding: 10px;
-            vertical-align: middle;
         }
-
-        .sw-table-icon {
-            transition: transform .1s ease;
-            fill: var(--sw-table-font-color);
-        }
-
-        .sw-table-button {
-            all: unset;
-            user-select: none;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-
-            &:hover {
-                color: var(--sw-table-icon-hover);
-                .sw-table-icon {
-                    fill: var(--sw-table-icon-hover);
-                }
-            }
-        }
-
-        .sw-table-detail-tr {
-            border-bottom: 1px solid var(--sw-table-inner-border);
-            border-left: 1px solid var(--sw-table-inner-border);
-            border-right: 1px solid var(--sw-table-inner-border);
-
-            td {
-                padding: 0px;
-            }
-
-        }
-
     }
 
 
     /* Theme colors */
-    --sw-table-mint-light: hsla(150, 40%, 85%, 0.2);
+    /* --sw-table-mint-light: hsla(150, 40%, 85%, 0.2);
     --sw-table-mint-dark: hsla(150, 40%, 55%, 0.2);
     --sw-table-mint-accent: hsla(0, 100%, 40%, 1);
 
     --sw-table-ice-light: hsla(200, 100%, 90%, 0.2);
     --sw-table-ice-dark: hsla(200, 100%, 70%, 0.2);
-    --sw-table-ice-accent: rgb(0, 255, 208);
+    --sw-table-ice-accent: rgb(0, 255, 208); */
+    /* Default theme  */
+    --font: normal 1em Helvetica,
+    Arial,
+    sans-serif;
+    --fontColor: #2a2a2a;
+    --iconColor: var(--fontColor);
+    --rowBackgroundColor: white;
+    --rowHoverBackgroundColor: #f5f5f5;
+    --rowHoverFontColor: var(--fontColor);
+    --rowHoverIconColor: var(--fontColor);
+    --detailBackgroundColor: #e8f4f8;
+    --boxShadow: 0px 0px 3px 3px #f5f5f5;
+    --buttonFocusColor: darkblue;
+    --innerBorderColor: #ccc;
+    --outerBorderColor: #ccc;
+    --theadBackgroundColor: #e8f4f8;
+    --tfootBackgroundColor: #e8f4f8;
 }
 
 .sw-table[data-sw-table-theme="mint"] {
-    /* Mint theme */
-    font-family: 'Segoe UI', sans-serif;
-    --sw-table-font-color: black;
-    --sw-table-font-color-hover: black;
-    --sw-table-box-shadow: 0px 2px 2px 2px var(--sw-table-mint-light);
-    --sw-table-row-even: var(--sw-table-mint-light);
-    /* --sw-table-row-odd: white; */
-    --sw-table-tr-hover: var(--sw-table-mint-dark);
-    --sw-table-icon-hover: var(--sw-table-mint-accent);
-    --sw-table-inner-border: var(--sw-table-mint-accent);
-    --sw-table-outer-border: var(--sw-table-mint-dark);
+    --font: normal 1em Helvetica, Arial, sans-serif;
+    --fontColor: green;
+    --iconColor: var(--fontColor);
+    --rowBackgroundColor: white;
+    --rowHoverBackgroundColor: #f5f5f5;
+    --rowHoverFontColor: var(--fontColor);
+    --rowHoverIconColor: var(--fontColor);
+    --detailBackgroundColor: #e8f4f8;
+    --boxShadow: 0px 0px 3px 3px #f5f5f5;
+    --buttonFocusColor: darkblue;
+    --innerBorderColor: #ccc;
+    --outerBorderColor: #ccc;
+    --theadBackgroundColor: #e8f4f8;
+    --tfootBackgroundColor: #e8f4f8;
 }
 
-.sw-table[data-sw-table-theme="ice"] {
-    /* Ice theme */
-
-    /* These themes could be abstracted an extra layer so that it is --sw-table-theme-dark etc.
-     But this would be a little more restrictive */
-    font-family: 'Georgia', serif;
-    --sw-table-font-color: darkblue;
-    --sw-table-font-color-hover: red;
-    --sw-table-box-shadow: 0px 2px 2px 2px var(--sw-table-ice-light);
-    --sw-table-row-even: var(--sw-table-ice-light);
-    /* --sw-table-row-odd: white; */
-    --sw-table-tr-hover: var(--sw-table-ice-dark);
-    --sw-table-icon-hover: var(--sw-table-ice-accent);
-    --sw-table-inner-border: var(--sw-table-ice-accent);
-    --sw-table-outer-border: var(--sw-table-ice-accent);
-}
-
-
-
-
-/* .sw-table-tr-even {
-    background-color: var(--sw-table-row-even);
-}
-
-.sw-table-tr-odd {
-    background-color: var(--sw-table-row-odd);
-} */
 
 
 
