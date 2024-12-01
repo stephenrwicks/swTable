@@ -30,6 +30,10 @@ class Table {
     #tfootTr = document.createElement('tr');
     #tfootTd = document.createElement('td');
 
+    #els:{ [key: string]: HTMLElement | null } = {
+
+    }
+
     columnsObject: { [key: string]: Column | BuiltInColumn | null } = {
         detail: null,
         checkbox: null,

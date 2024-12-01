@@ -23,18 +23,29 @@ class Column {
         this.sortBy = settings.sortBy;
         this.name = settings.name ?? '';
         this.th.draggable = true;
-        // this.th.addEventListener('dragstart', (e) => {
-        //     console.log(e);
-        //     const dragImage = document.createElement('div');
-        //     //dragImage.style.pointerEvents = 'none'; // Prevent interactions
-        //     dragImage.style.height = '1px';
-        //     dragImage.style.width= '1px';
-        //     document.body.append(dragImage);
-        //     // Use the custom element as the drag image
-        //     e.dataTransfer.setDragImage(dragImage, 0, 0);
-        //     // Clean up after drag ends
-        //     setTimeout(() => document.body.removeChild(dragImage), 0);
-        // });
+        this.th.addEventListener('dragstart', (e) => {
+            e.dataTransfer?.setDragImage(document.createElement('div'), 0, 0); // Hides default drag placeholder
+            this.#table.element.dataset.dragColId = this.colId; // Use table dataset to track dragged col
+            this.th.style.backgroundColor = 'lightblue';
+            this.cellsCurrentPage.forEach(td => td.style.backgroundColor = 'lightblue');
+        });
+        this.th.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            // We never actually need to use "drop" if we do this
+            const colId = this.#table.element.dataset.dragColId;
+            if (colId === this.colId)
+                return;
+            const draggingColumn = this.#table?.columnsObject[colId];
+            if (!draggingColumn)
+                return;
+            draggingColumn.moveTo(this.sortOrder);
+        });
+        this.th.addEventListener('dragend', (e) => {
+            e.preventDefault();
+            delete this.#table.element.dataset.dragColId;
+            this.th.style.backgroundColor = '';
+            this.cellsCurrentPage.forEach(td => td.style.backgroundColor = '');
+        });
     }
     addHoverEffect(color) {
         this.th.addEventListener('mouseover', () => {
@@ -110,32 +121,31 @@ class Column {
             index = table.columns.length - 1;
         if (this.sortOrder === index)
             return;
-        table.columns.forEach((col, i) => {
-            col.sortOrder = i;
+        const currentSortOrder = this.sortOrder;
+        const targetSortOrder = index;
+        table.columns.forEach(col => {
+            if (col === this) {
+                col.sortOrder = index; // Set the sortOrder for the moved column
+            }
+            else if (currentSortOrder < targetSortOrder) {
+                // Moving forward: Shift columns in the target range back by 1
+                if (col.sortOrder > currentSortOrder && col.sortOrder <= targetSortOrder) {
+                    col.sortOrder -= 1;
+                }
+            }
+            else {
+                // Moving backward: Shift columns in the target range forward by 1
+                if (col.sortOrder < currentSortOrder && col.sortOrder >= targetSortOrder) {
+                    col.sortOrder += 1;
+                }
+            }
         });
-        if (this.sortOrder < index) { // Moving forward
-            for (const col of table.columns) {
-                if (col.sortOrder > index)
-                    col.sortOrder++;
-                else
-                    col.sortOrder--;
-            }
-        }
-        else { // Moving backward
-            for (const col of table.columns) {
-                if (col.sortOrder < index)
-                    col.sortOrder--;
-                else
-                    col.sortOrder++;
-            }
-        }
-        this.sortOrder = index;
         table.renderColumnTr();
         for (const row of table.rows)
             row.render();
-        for (const column of table.columns) {
-            console.log(column.sortOrder);
-        }
+        // for (const column of table.columns) {
+        //     console.log(column.sortOrder);
+        // }
     }
     destroy() {
         if (!this.#table)
@@ -162,7 +172,7 @@ class Column {
         }
         // Re-sort if we are already sorted by this column
         this.th.querySelector('button').onclick = isSortable ? () => this.sort() : null;
-        this.th.querySelector('button').disabled = !isSortable;
+        //this.th.querySelector('button')!.disabled = !isSortable;
         this.th.dataset.isSortable = String(isSortable);
     }
     #isAscending = false;

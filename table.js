@@ -14,6 +14,7 @@ class Table {
     #tfoot = document.createElement('tfoot');
     #tfootTr = document.createElement('tr');
     #tfootTd = document.createElement('td');
+    #els = {};
     columnsObject = {
         detail: null,
         checkbox: null,

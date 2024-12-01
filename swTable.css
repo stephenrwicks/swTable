@@ -1,3 +1,4 @@
+
 .sw-table {
     width: fit-content;
     border-collapse: collapse;
@@ -26,6 +27,14 @@
         vertical-align: middle;
     }
 
+
+    th[data-is-sortable="false"] .sw-table-button {
+        cursor: default;
+    }
+
+    td:has(.sw-table-header) {
+        background-color: white;
+    }
 
     thead tr {
         background-color: var(--theadBackgroundColor);
@@ -76,9 +85,9 @@
         align-items: center;
         cursor: pointer;
 
-        &:disabled {
+        /* &:disabled {
             cursor: default;
-        }
+        } */
 
         &:focus-visible {
             outline: 1px solid var(--buttonFocusColor);
