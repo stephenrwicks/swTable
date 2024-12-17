@@ -1,6 +1,21 @@
+// Paging buttons, paging dropdown
+// Filters, FilterBox, FilterModal? -- Use sliders icon
+// show/hide column options
+// Fix colspan issues
+// CSS Themes and additions, icon hovers
+// Horizontal scroll + resizable
+// Generic typed data
+// Functional actions button disabled
+// Row actions setter
+// Move / drag row
+// Lazy render
+// Editable, crud modal, etc.
+// Preserving focus
+// Improve column drag
+// Automatic init
+// Init from html
 
-import { Column, ColumnSettings, BuiltInColumn, CheckboxColumn } from './column.js';
-import { css } from './css.js';
+import { Column, ColumnSettings, BuiltInColumn } from './column.js';
 import { Row } from './row.js';
 import { rowToTable, columnToTable } from './weakMaps.js';
 import { ActionSettings } from './actions.js';
@@ -13,33 +28,38 @@ type TableSettings = {
     data?: Array<any>;
     showSearch?: boolean;
     pageLength?: number;
+    pageLengthOptions?: Array<number>;
     detailFn?(row: Row): HTMLElement | string | null;
-    checkboxFn?(row: Row): boolean | null;
+    checkboxFn?(row: Row): boolean;
     actionsFn?(row: Row): ActionSettings | null;
 }
 
 class Table {
 
-    #headerDiv = document.createElement('div');
-    #table = document.createElement('table');
-    #thead = document.createElement('thead');
-    #headerTd = document.createElement('td');
-    #columnTr = document.createElement('tr');
-    #tbody = document.createElement('tbody');
-    #tfoot = document.createElement('tfoot');
-    #tfootTr = document.createElement('tr');
-    #tfootTd = document.createElement('td');
-
-    #els:{ [key: string]: HTMLElement | null } = {
-
-    }
+    #els = {
+        wrapper: document.createElement('div'),
+        table: document.createElement('table'),
+        thead: document.createElement('thead'),
+        headerTd: document.createElement('td'),
+        headerDiv: document.createElement('div'),
+        columnTr: document.createElement('tr'),
+        tbody: document.createElement('tbody'),
+        tfoot: document.createElement('tfoot'),
+        tfootTr: document.createElement('tr'),
+        tfootTd: document.createElement('td'),
+        tfootDiv: document.createElement('div'),
+        nextPageButton: document.createElement('button'),
+        prevPageButton: document.createElement('button'),
+        pageNumberDiv: document.createElement('div'),
+        pageLengthSelect: document.createElement('select'),
+        selectAllCheckbox: document.createElement('input'),
+    };
 
     columnsObject: { [key: string]: Column | BuiltInColumn | null } = {
         detail: null,
         checkbox: null,
         actions: null
     };
-    // This object could also live outside the class in weakmaps, etc.
 
     constructor(settings: TableSettings) {
         if (!settings?.columns) throw new Error('SwTable - no columns defined');
@@ -59,30 +79,73 @@ class Table {
                 this.insertRow(datum);
             }
         }
+
+        this.pageLengthOptions = settings.pageLengthOptions ?? [0];
+
+        this.pageLength = Array.isArray(this.pageLengthOptions) ? this.pageLengthOptions[0] : 0;
+
         settings.showSearch ??= true;
         this.showSearch = !!settings.showSearch;
+
         const headerTr = document.createElement('tr');
-        //this.#headerTd.classList.add('sw-table-header-td');
-        this.#headerTd.append(this.#headerDiv);
-        headerTr.append(this.#headerTd);
-        this.#headerTd.colSpan = 999;
-        this.#thead.append(headerTr, this.#columnTr);
-        this.#tfootTr.append(this.#tfootTd);
-        this.#tfoot.append(this.#tfootTr);
-        this.#table.append(this.#thead, this.#tbody, this.#tfoot);
-        this.#headerDiv.classList.add(css.header);
-        this.#table.classList.add('sw-table');
-        this.#table.dataset.swTableTheme = typeof settings.theme === 'string' ? settings.theme : '';
+        this.#els.headerTd.append(this.#els.headerDiv);
+        headerTr.append(this.#els.headerTd);
+        this.#els.headerTd.colSpan = 999;
+        this.#els.thead.append(headerTr, this.#els.columnTr);
+        this.#els.tfootDiv.append(this.#els.pageNumberDiv, this.#els.prevPageButton, this.#els.nextPageButton);
+        this.#els.tfootTd.append(this.#els.tfootDiv);
+        this.#els.tfootTr.append(this.#els.tfootTd);
+        this.#els.tfoot.append(this.#els.tfootTr);
+        this.#els.table.append(this.#els.thead, this.#els.tbody, this.#els.tfoot);
+        this.#els.wrapper.append(this.#els.table);
+        this.#els.headerDiv.classList.add('sw-table-header');
+        this.#els.headerTd.classList.add('sw-table-header-td');
+        this.#els.table.classList.add('sw-table');
+        this.#els.wrapper.classList.add('sw-table-wrapper');
+        this.#els.tfootDiv.classList.add('sw-table-tfoot-div');
+        this.#els.pageNumberDiv.classList.add('sw-table-page-number-div');
+        this.#els.selectAllCheckbox.classList.add('sw-table-checkbox');
+        this.#els.pageLengthSelect.classList.add('sw-table-page-length-select');
+        this.#els.selectAllCheckbox.title = 'Toggle All';
+
+        this.#els.pageLengthSelect.addEventListener('change', () => this.pageLength = Number(this.#els.pageLengthSelect.value));
+
+        this.#els.table.dataset.swTableTheme = typeof settings.theme === 'string' ? settings.theme : '';
         if (typeof settings.pageLength === 'number') {
             this.pageLength = settings.pageLength;
         }
         else {
             this.goToPage(1);
         }
+
+        this.#els.selectAllCheckbox.type = 'checkbox';
+        this.#els.selectAllCheckbox.addEventListener('change', () => this.toggleCheckAllRows());
+        this.#els.nextPageButton.type = 'button';
+        this.#els.prevPageButton.type = 'button';
+        this.#els.nextPageButton.title = 'Next Page';
+        this.#els.prevPageButton.title = 'Previous Page';
+        this.#els.prevPageButton.classList.add('sw-table-button', 'sw-table-prev-page-button', 'sw-table-button-circle');
+        this.#els.nextPageButton.classList.add('sw-table-button', 'sw-table-next-page-button', 'sw-table-button-circle');
+        this.#els.nextPageButton.addEventListener('click', () => this.goToPage(this.currentPage + 1));
+        this.#els.prevPageButton.addEventListener('click', () => this.goToPage(this.currentPage - 1));
+        this.#els.nextPageButton.append(icons.chevron());
+        this.#els.prevPageButton.append(icons.chevron());
     }
 
+    setData(data: Array<any>) {
+        this.data = data;
+    }
     get data() {
         return this.rows.map(row => row.data);
+    }
+    set data(data: Array<any>) {
+        while (this.rows.length) {
+            this.rows[0].destroy();
+        }
+        for (const datum of data) {
+            this.insertRow(datum);
+        }
+        this.goToPage(1);
     }
     get dataTarget() {
         return this.rows.map(row => row.dataTarget);
@@ -92,45 +155,19 @@ class Table {
     }
 
     get element() {
-        return this.#table;
+        return this.#els.wrapper;
     }
 
     get colSpan(): number {
-        return this.#columnTr.children.length;
+        return this.#els.columnTr.children.length;
     }
 
-    #showSearch = false;
-    searchInput: HTMLInputElement | null = null;
-    get showSearch() {
-        return this.#showSearch;
-    }
-    set showSearch(bool: boolean) {
-        bool = !!bool;
-        if (!this.#showSearch && bool) {
-            const searchWrapper = document.createElement('div');
-            searchWrapper.classList.add('sw-table-search-wrapper');
-            const searchIcon = icons.magnifyingGlass();
-            this.searchInput ??= document.createElement('input');
-            this.searchInput.type = 'text';
-            this.searchInput.classList.add('sw-table-search');
-            this.searchInput.addEventListener('input', () => this.goToPage(1));
-            searchWrapper.append(searchIcon, this.searchInput);
-            this.#headerDiv.append(searchWrapper);
-        }
-        else if (this.#showSearch && !bool) {
-            this.searchInput?.parentElement?.remove();
-            this.searchInput?.remove();
-            this.searchInput = null;
-        }
-        this.#showSearch = !!bool;
-    }
-
-
-
-    get columns() {
-        return Object.values(this.columnsObject)
-            .filter(column => column instanceof Column)
-            .sort((a, b) => a.sortOrder - b.sortOrder);
+    get columns(): Array<Column> {
+        // The compiler was complaining a lot about this method until I broke it up into 3 lines
+        const columnVals = Object.values(this.columnsObject);
+        const customCols = columnVals.filter(column => column instanceof Column) as Array<Column>;
+        const sortedCustomCols = customCols.sort((a: Column, b: Column) => a.sortOrder - b.sortOrder) as Array<Column>;
+        return sortedCustomCols;
     }
 
     insertColumn(settings: ColumnSettings, index: number) {
@@ -143,12 +180,17 @@ class Table {
         for (const row of this.rows) row.render();
     }
 
-    destroyColumn(index: number) {
-    }
-
     #rows: Array<Row> = [];
     get rows() {
         return this.#rows;
+    }
+
+    renderPage(targetPage: number) {
+        // To optimize, each row could have a "state" object
+        for (const row of this.rowsCurrentPage) {
+
+        }
+        // Fewer loops
     }
 
     insertRow(data: any, index?: number) {
@@ -161,7 +203,7 @@ class Table {
         }
         else {
             this.#rows.push(row);
-            this.#tbody.append(row.tr);
+            this.#els.tbody.append(row.tr);
         }
 
     }
@@ -195,7 +237,9 @@ class Table {
     set checkboxFn(fn: TableSettings['checkboxFn'] | null) {
         this.#checkboxFn = fn;
         if (typeof this.#checkboxFn === 'function') {
-            this.columnsObject.checkbox ??= new CheckboxColumn();
+            this.columnsObject.checkbox ??= new BuiltInColumn('checkbox');
+            this.columnsObject.checkbox.th.append(this.#els.selectAllCheckbox);
+
         }
         else {
             this.columnsObject.checkbox?.destroy();
@@ -231,6 +275,59 @@ class Table {
         this.goToPage(1);
     }
 
+
+    #pageLengthOptions: Array<number> | null = null;
+    get pageLengthOptions() {
+        return this.#pageLengthOptions;
+    }
+    set pageLengthOptions(options) {
+        if (!Array.isArray(options) || !options.length) {
+            this.#pageLengthOptions = [0];
+        }
+        else {
+            this.#pageLengthOptions = options;
+        }
+        this.#els.pageLengthSelect.replaceChildren();
+        if (this.#pageLengthOptions.length > 1) {
+            for (const n of this.#pageLengthOptions.sort((a, b) => a - b)) {
+                this.#els.pageLengthSelect.add(new Option(n === 0 ? 'All' : String(n), String(n)));
+            }
+            this.#els.headerDiv.append(this.#els.pageLengthSelect);
+        }
+        console.log('x');
+    }
+
+    #showSearch = false;
+    searchInput: HTMLInputElement | null = null;
+    get showSearch() {
+        return this.#showSearch;
+    }
+    set showSearch(bool: boolean) {
+        bool = !!bool;
+        if (!this.#showSearch && bool) {
+            const searchWrapper = document.createElement('div');
+            searchWrapper.classList.add('sw-table-search-wrapper');
+            const searchIcon = icons.magnifyingGlass();
+            this.searchInput ??= document.createElement('input');
+            this.searchInput.type = 'text';
+            this.searchInput.title = 'Search';
+            this.searchInput.classList.add('sw-table-search');
+            this.searchInput.addEventListener('input', () => {
+                this.goToPage(1);
+                this.updateSelectAllCheckbox();
+            });
+            searchWrapper.append(searchIcon, this.searchInput);
+            this.#els.headerDiv.append(searchWrapper);
+        }
+        else if (this.#showSearch && !bool) {
+            this.searchInput?.parentElement?.remove();
+            this.searchInput?.remove();
+            this.searchInput = null;
+        }
+        this.#showSearch = !!bool;
+    }
+
+
     #currentPage = 1;
     get currentPage() {
         return this.#currentPage;
@@ -248,7 +345,7 @@ class Table {
         return this.rows.filter(row => row.isFilterTrue);
     }
 
-    get #rowsFilterTruePartitioned() {
+    get #rowsFilterTruePartitionedByPage() {
         if (this.#pageLength === 0) return [this.rowsFilterTrue]; // If pageLength is 0, one page
         return Array.from({ length: this.numberOfPages }, (_, i) => {
             return this.rowsFilterTrue.slice(i * this.#pageLength, (i + 1) * this.#pageLength);
@@ -256,24 +353,23 @@ class Table {
     }
 
     get rowsCurrentPage() {
-        return this.#rowsFilterTruePartitioned[this.#currentPage - 1] ?? [];
+        return this.#rowsFilterTruePartitionedByPage[this.#currentPage - 1] ?? [];
     }
 
     get rowsChecked() {
-        return this.rows.filter(row => row.isChecked);
+        return this.rowsFilterTrue.filter(row => row.isChecked);
     }
 
     checkAllRows() {
-        for (const row of this.rows) row.isChecked = true;
-        //this.columnsObject.
+        for (const row of this.rowsFilterTrue) row.isChecked = true;
     }
 
     uncheckAllRows() {
-        for (const row of this.rows) row.isChecked = false;
+        for (const row of this.rowsFilterTrue) row.isChecked = false;
     }
 
     toggleCheckAllRows() {
-        if (this.rows.some(row => !!row.checkbox && !row.isChecked)) {
+        if (this.rowsFilterTrue.filter(row => !!row.checkbox).some(row => !row.isChecked)) {
             this.checkAllRows()
         }
         else {
@@ -281,7 +377,15 @@ class Table {
         }
     }
 
-    #pageLength = 15;
+    updateSelectAllCheckbox() {
+        this.#els.selectAllCheckbox.style.visibility = this.rowsFilterTrue.some(row => !!row.checkbox) ? 'visible' : 'hidden';
+        const allChecked = this.rowsFilterTrue.filter(row => !!row.checkbox).every(row => row.isChecked);
+        const someChecked = this.rowsFilterTrue.filter(row => !!row.checkbox).some(row => row.isChecked);
+        this.#els.selectAllCheckbox.checked = allChecked;
+        this.#els.selectAllCheckbox.indeterminate = !allChecked && someChecked;
+    }
+
+    #pageLength = 0;
     get pageLength() {
         return this.#pageLength;
     }
@@ -296,30 +400,32 @@ class Table {
         n = Math.floor(n);
         if (n < 1) n = 1;
         if (n > this.numberOfPages) n = this.numberOfPages;
-        this.#tbody.replaceChildren();
+        this.#els.tbody.replaceChildren();
         this.#currentPage = n;
         const rowsToShow = this.rowsCurrentPage;
         rowsToShow.forEach((row, i) => {
             row.tr.className = i % 2 === 1 ? 'sw-table-tr-odd' : '';
-            this.#tbody.append(row.tr);
-            if (row.detail && row.detailIsVisible) this.#tbody.append(row.detail.tr);
+            this.#els.tbody.append(row.tr);
+            if (row.detail && row.detailIsVisible) this.#els.tbody.append(row.detail.tr);
         });
 
-        const first = this.rows.indexOf(rowsToShow[0]) + 1;
-        const last = this.rows.indexOf(rowsToShow[rowsToShow.length - 1]) + 1;
-        this.#tfootTd.colSpan = this.colSpan;
-        this.#tfootTd.textContent = `Showing ${first}-${last} of ${this.#rows.length}`;
+        const first = this.rowsFilterTrue.indexOf(rowsToShow[0]) + 1;
+        const last = this.rowsFilterTrue.indexOf(rowsToShow[rowsToShow.length - 1]) + 1;
+        this.#els.tfootTd.colSpan = this.colSpan;
+        this.#els.pageNumberDiv.textContent = `Showing ${first}-${last} of ${this.rowsFilterTrue.length}`;
+        this.#els.nextPageButton.style.visibility = this.currentPage < this.numberOfPages ? 'visible' : 'hidden';
+        this.#els.prevPageButton.style.visibility = this.currentPage > 1 ? 'visible' : 'hidden';
     }
 
     renderColumnTr() {
-        this.#columnTr.replaceChildren();
-        if (this.columnsObject.detail) this.#columnTr.append(this.columnsObject.detail.th);
+        this.#els.columnTr.replaceChildren();
+        if (this.columnsObject.detail) this.#els.columnTr.append(this.columnsObject.detail.th);
         for (const column of this.columns) {
             if (column === null) continue;
-            this.#columnTr.append(column.th);
+            this.#els.columnTr.append(column.th);
         }
-        if (this.columnsObject.actions) this.#columnTr.append(this.columnsObject.actions.th);
-        if (this.columnsObject.checkbox) this.#columnTr.append(this.columnsObject.checkbox.th);
+        if (this.columnsObject.actions) this.#els.columnTr.append(this.columnsObject.actions.th);
+        if (this.columnsObject.checkbox) this.#els.columnTr.append(this.columnsObject.checkbox.th);
     }
 }
 
@@ -436,12 +542,148 @@ const data = [
             category: "Retail",
             region: "Central"
         }
-    }
+    },
+    {
+        id: 1,
+        revenue: 1200.50,
+        expenses: 450.75,
+        details: {
+            category: "Retail",
+            region: "North"
+        }
+    },
+    {
+        id: 2,
+        revenue: 980.00,
+        expenses: 300.50,
+        details: {
+            category: "Wholesale",
+            region: "West"
+        }
+    },
+    {
+        id: 3,
+        revenue: 1500.75,
+        expenses: 700.25,
+        details: {
+            category: "Online",
+            region: "East"
+        }
+    },
+    {
+        id: 4,
+        revenue: 2000.00,
+        expenses: 1200.00,
+        details: {
+            category: "Corporate",
+            region: "South"
+        }
+    },
+    {
+        id: 5,
+        revenue: 850.25,
+        expenses: 400.50,
+        details: {
+            category: "Retail",
+            region: "Central"
+        }
+    },
+    {
+        id: 1,
+        revenue: 1200.50,
+        expenses: 450.75,
+        details: {
+            category: "Retail",
+            region: "North"
+        }
+    },
+    {
+        id: 2,
+        revenue: 980.00,
+        expenses: 300.50,
+        details: {
+            category: "Wholesale",
+            region: "West"
+        }
+    },
+    {
+        id: 3,
+        revenue: 1500.75,
+        expenses: 700.25,
+        details: {
+            category: "Online",
+            region: "East"
+        }
+    },
+    {
+        id: 4,
+        revenue: 2000.00,
+        expenses: 1200.00,
+        details: {
+            category: "Corporate",
+            region: "South"
+        }
+    },
+    {
+        id: 5,
+        revenue: 850.25,
+        expenses: 400.50,
+        details: {
+            category: "Retail",
+            region: "Central"
+        }
+    },
+    {
+        id: 1,
+        revenue: 1200.50,
+        expenses: 450.75,
+        details: {
+            category: "Retail",
+            region: "North"
+        }
+    },
+    {
+        id: 2,
+        revenue: 980.00,
+        expenses: 300.50,
+        details: {
+            category: "Wholesale",
+            region: "West"
+        }
+    },
+    {
+        id: 3,
+        revenue: 1500.75,
+        expenses: 700.25,
+        details: {
+            category: "Online",
+            region: "East"
+        }
+    },
+    {
+        id: 4,
+        revenue: 2000.00,
+        expenses: 1200.00,
+        details: {
+            category: "Corporate",
+            region: "South"
+        }
+    },
+    {
+        id: 5,
+        revenue: 850.25,
+        expenses: 400.50,
+        details: {
+            category: "Retail",
+            region: "Central"
+        }
+    },
 ];
 
 //@ts-ignore
 window.x = new Table({
-    pageLength: 10,
+    // pageLength: 4,
+    pageLengthOptions: [5, 10],
     columns: [
         {
             name: 'ID',
@@ -474,14 +716,20 @@ window.x = new Table({
         return 'x';
     },
     checkboxFn(row) {
-        return null;
+        return row.data.id > 2;
     },
     actionsFn(row) {
         return [
             {
                 text: 'Set Revenue',
                 fn() {
-                   row.data.revenue = Number(prompt('Revenue was:'));
+                    row.data.revenue = Number(prompt('Revenue was:'));
+                }
+            },
+            {
+                text: 'Delete Row',
+                fn() {
+                    row.destroy();
                 }
             }
         ]
@@ -494,6 +742,7 @@ window.x = new Table({
 // Seems like every time data changes, you should re-sort and re-filter
 window.q = new Table({
     pageLength: 10,
+    pageLengthOptions: [5, 12],
     columns: [
         {
             name: 'count',

@@ -1,7 +1,6 @@
-import { css } from './css.js';
 import { icons } from './icons.js';
 import { columnToTable } from './weakMaps.js';
-export { Column, BuiltInColumn, CheckboxColumn };
+export { Column, BuiltInColumn };
 class Column {
     th = document.createElement('th');
     colId = crypto.randomUUID();
@@ -11,7 +10,7 @@ class Column {
         const span = document.createElement('span');
         const chevron = icons.chevron();
         thButton.type = 'button';
-        thButton.classList.add(css.button);
+        thButton.classList.add('sw-table-button');
         thButton.append(span, chevron);
         this.th.append(thButton);
         this.th.dataset.isAscending = 'false';
@@ -24,14 +23,21 @@ class Column {
         this.name = settings.name ?? '';
         this.th.draggable = true;
         this.th.addEventListener('dragstart', (e) => {
-            e.dataTransfer?.setDragImage(document.createElement('div'), 0, 0); // Hides default drag placeholder
-            this.#table.element.dataset.dragColId = this.colId; // Use table dataset to track dragged col
-            this.th.style.backgroundColor = 'lightblue';
-            this.cellsCurrentPage.forEach(td => td.style.backgroundColor = 'lightblue');
+            const table = this.#table;
+            if (!table)
+                return;
+            // Make the dragged column as wide as the widest column. Prevents flickering
+            const largestWidth = table.columns
+                .map(col => parseFloat(getComputedStyle(col.th).width))
+                .reduce((max, width) => Math.max(max, width), 0);
+            this.th.style.width = `${largestWidth}px`;
+            this.th.classList.add('sw-table-dragging');
+            e.dataTransfer.setDragImage(document.createElement('div'), 0, 0); // Hides default drag placeholder
+            table.element.dataset.dragColId = this.colId; // Use table dataset to track dragged col
+            this.cellsCurrentPage.forEach(td => td.classList.add('sw-table-dragging'));
         });
         this.th.addEventListener('dragover', (e) => {
             e.preventDefault();
-            // We never actually need to use "drop" if we do this
             const colId = this.#table.element.dataset.dragColId;
             if (colId === this.colId)
                 return;
@@ -41,24 +47,26 @@ class Column {
             draggingColumn.moveTo(this.sortOrder);
         });
         this.th.addEventListener('dragend', (e) => {
+            if (!this.#table)
+                return;
             e.preventDefault();
             delete this.#table.element.dataset.dragColId;
-            this.th.style.backgroundColor = '';
-            this.cellsCurrentPage.forEach(td => td.style.backgroundColor = '');
+            this.th.classList.remove('sw-table-dragging');
+            this.th.style.width = '';
+            this.cellsCurrentPage.forEach(td => td.classList.remove('sw-table-dragging'));
         });
     }
-    addHoverEffect(color) {
-        this.th.addEventListener('mouseover', () => {
-            this.th.style.backgroundColor = color;
-            for (const cell of this.cellsCurrentPage ?? [])
-                cell.style.backgroundColor = color;
-        });
-        this.th.addEventListener('mouseout', () => {
-            this.th.style.backgroundColor = '';
-            for (const cell of this.cellsCurrentPage ?? [])
-                cell.style.backgroundColor = '';
-        });
-    }
+    // Could we just add class?
+    // addHoverEffect(color: string) {
+    //     this.th.addEventListener('mouseover', () => {
+    //         this.th.style.backgroundColor = color;
+    //         for (const cell of this.cellsCurrentPage ?? []) cell.style.backgroundColor = color;
+    //     });
+    //     this.th.addEventListener('mouseout', () => {
+    //         this.th.style.backgroundColor = '';
+    //         for (const cell of this.cellsCurrentPage ?? []) cell.style.backgroundColor = '';
+    //     });
+    // }
     // #isReactive = true;
     // get isReactive() {
     //     return this.#isReactive;
@@ -69,14 +77,6 @@ class Column {
     get #table() {
         return columnToTable.get(this);
     }
-    // get index() {
-    //     if (!this.#table) return -1;
-    //     return this.#table.columns.indexOf(this);
-    // }
-    // get i() {
-    //     if (!this.#table) return -1;
-    //     return [...this.#table.element.querySelectorAll('thead tr th')].indexOf(this.th);
-    // }
     #render;
     get render() {
         return this.#render;
@@ -106,7 +106,7 @@ class Column {
     }
     get cellsCurrentPage() {
         if (!this.#table)
-            return null;
+            return [];
         return this.#table.rowsCurrentPage.map(row => row.cells[this.colId]);
     }
     moveTo(index) {
@@ -217,6 +217,7 @@ class BuiltInColumn {
     colId;
     constructor(type) {
         this.colId = type;
+        this.th.classList.add('sw-table-th-built-in', `sw-table-th-built-in-${type}`);
     }
     get #table() {
         return columnToTable.get(this);
@@ -227,18 +228,5 @@ class BuiltInColumn {
         this.#table.columnsObject[this.colId] = null;
         columnToTable.delete(this);
         this.th = null;
-        // this.#renderTheadTr();
-    }
-}
-class CheckboxColumn extends BuiltInColumn {
-    // Select all must determine whether to show,
-    // and whether to be checked / indeterminate
-    // Only shows when rowsFilterTrue has a checkbox
-    selectAllCheckbox = document.createElement('input');
-    constructor() {
-        super('checkbox');
-        this.selectAllCheckbox.type = 'checkbox';
-        this.selectAllCheckbox.classList.add(css.checkbox);
-        this.th.append(this.selectAllCheckbox);
     }
 }

@@ -1,11 +1,10 @@
-import { css } from "./css.js";
 export { Detail };
 class Detail {
     tr = document.createElement('tr');
     #td = document.createElement('td');
     constructor() {
         this.tr.append(this.#td);
-        this.tr.classList.add(css.detailTr);
+        this.tr.classList.add('sw-table-detail-tr');
     }
     render(contents, colSpan) {
         this.#td.colSpan = colSpan;

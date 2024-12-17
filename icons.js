@@ -1,4 +1,3 @@
-import { css } from './css.js';
 export { icons };
 const icons = {
     magnifyingGlass() {
@@ -21,7 +20,7 @@ const icons = {
         line.setAttribute('stroke', 'black');
         line.setAttribute('stroke-width', '2');
         svg.append(circle, line);
-        svg.classList.add(css.icon);
+        svg.classList.add('sw-table-icon', 'sw-table-magnifying-glass');
         return svg;
     },
     ellipsis() {
@@ -30,10 +29,8 @@ const icons = {
         svg.setAttribute('viewBox', '0 0 24 24');
         svg.setAttribute('width', '24');
         svg.setAttribute('height', '24');
-        svg.appendChild(createCircle('12', '6')); // Top dot
-        svg.appendChild(createCircle('12', '12')); // Middle dot
-        svg.appendChild(createCircle('12', '18')); // Bottom dot
-        svg.classList.add(css.icon);
+        svg.append(createCircle('12', '6'), createCircle('12', '12'), createCircle('12', '18'));
+        svg.classList.add('sw-table-icon', 'sw-table-ellipsis');
         return svg;
     },
     chevron() {
@@ -42,12 +39,46 @@ const icons = {
         svg.setAttribute('viewBox', '0 0 24 24');
         svg.setAttribute('width', '24');
         svg.setAttribute('height', '24');
-        // svg.setAttribute('fill', 'black');
         path.setAttribute('d', 'M8.59 16.59L13.17 12L8.59 7.41L10 6L16 12L10 18L8.59 16.59Z');
         svg.append(path);
-        svg.classList.add(css.icon);
+        svg.classList.add('sw-table-icon', 'sw-table-chevron');
         return svg;
     },
+    sliders() {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('width', '24');
+        svg.setAttribute('height', '24');
+        const topCircle = createCircle('6', '5');
+        svg.append(topCircle);
+        const topRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        topRect.setAttribute('x', '2');
+        topRect.setAttribute('y', '4');
+        topRect.setAttribute('width', '20');
+        topRect.setAttribute('height', '2');
+        topRect.setAttribute('rx', '1');
+        svg.append(topRect);
+        const middleCircle = createCircle('18', '12');
+        svg.append(middleCircle);
+        const middleRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        middleRect.setAttribute('x', '2');
+        middleRect.setAttribute('y', '11');
+        middleRect.setAttribute('width', '20');
+        middleRect.setAttribute('height', '2');
+        middleRect.setAttribute('rx', '1');
+        svg.append(middleRect);
+        const bottomCircle = createCircle('10', '19');
+        svg.append(bottomCircle);
+        const bottomRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        bottomRect.setAttribute('x', '2');
+        bottomRect.setAttribute('y', '18');
+        bottomRect.setAttribute('width', '20');
+        bottomRect.setAttribute('height', '2');
+        bottomRect.setAttribute('rx', '1');
+        svg.append(bottomRect);
+        svg.classList.add('sw-table-icon', 'sw-table-sliders');
+        return svg;
+    }
 };
 // Function to create a single circle
 const createCircle = (cx, cy) => {

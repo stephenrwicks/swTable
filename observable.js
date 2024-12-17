@@ -31,9 +31,10 @@ class Observable {
         };
         return new Proxy(obj, handler); // Return a new proxy object
     }
+    // oldValue: T, newValue: T
     #fireCallbacks() {
         for (const callback of this.#callbacks) {
-            callback();
+            callback(); // Each callback could have an oldValue, newValue pattern passed
         }
     }
     #proxy;

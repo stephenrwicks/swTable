@@ -1,39 +1,66 @@
+.sw-table-wrapper {
+    width: 900px;
+    /* resize: horizontal;
+    overflow: auto; */
+}
 
 .sw-table {
-    width: fit-content;
+    width: 100%;
+    display: table;
+    box-sizing: border-box;
     border-collapse: collapse;
-    padding: 8px;
+    padding: 0px;
     font: var(--font);
     color: var(--fontColor);
     box-shadow: var(--boxShadow);
 
-
     border: 1px solid var(--outerBorderColor);
 
+    .sw-table-header-td {
+        background-color: var(--headerBackgroundColor);
+    }
 
     .sw-table-header {
         display: flex;
         justify-content: end;
+        align-items: center;
+        min-height: 40px;
     }
 
-
-    td {
-        padding: 10px;
-        vertical-align: middle;
-    }
 
     th {
         padding: 0px;
         vertical-align: middle;
+
+        &:hover {
+            /* color: red;
+            fill: red; */
+        }
     }
 
+    td {
+        padding: 4px 10px;
+        vertical-align: middle;
+    }
+
+
+    .sw-table-dragging {
+        background-color: var(--dragColor);
+    }
 
     th[data-is-sortable="false"] .sw-table-button {
         cursor: default;
     }
 
-    td:has(.sw-table-header) {
-        background-color: white;
+    .sw-table-th-built-in {
+        width: min-content;
+    }
+
+    .sw-table-th-built-in-checkbox {
+        text-align: left;
+        padding: 4px 10px;
+        width: 50px;
+
     }
 
     thead tr {
@@ -71,9 +98,16 @@
 
     }
 
+    .sw-table-tfoot-div {
+        display: flex;
+        justify-content: end;
+        align-items: center;
+    }
+
     .sw-table-icon {
         fill: var(--fontColor);
         scale: 1.4;
+        display: block;
     }
 
     .sw-table-button {
@@ -84,10 +118,6 @@
         padding: 10px;
         align-items: center;
         cursor: pointer;
-
-        /* &:disabled {
-            cursor: default;
-        } */
 
         &:focus-visible {
             outline: 1px solid var(--buttonFocusColor);
@@ -100,6 +130,18 @@
                 fill: var(--iconHover);
             }
         }
+    }
+
+    .sw-table-button-circle {
+        border-radius: 50%;
+        transition: background-color .15s;
+        &:hover {
+            background-color: var(--buttonHoverBackground);
+        }
+    }
+
+    .sw-table-prev-page-button .sw-table-icon {
+        rotate: 180deg;
     }
 
     .sw-table-checkbox {
@@ -136,19 +178,23 @@
         }
     }
 
+    .sw-table-page-number-div {
+        margin-right: 20px;
+    }
+
     td:has(.sw-table-actions-div) {
         position: relative;
     }
 
     .sw-table-actions-div {
         position: absolute;
-        top: 100%;
-        left: 0px;
+        top: calc(100% - 8px);
+        left: -100%;
         background-color: white;
         border: 1px solid var(--outerBorderColor);
         z-index: 99;
         box-shadow: var(--boxShadow);
-        padding: 10px 0px;
+        padding-bottom: 10px;
 
         .sw-table-button {
             width: 7rem;
@@ -171,19 +217,22 @@
     }
 
     .sw-table-search {
+        all: unset;
+        font-size: .8em;
         grid-area: 1/1/1/1;
-        padding-left: 20px;
+        padding: 2px 2px 2px 25px;
+        border: 0px;
+        outline: 1px solid var(--buttonFocusColor);
+        background-color: white;
+
+        &:focus {
+            background-color: var(--buttonHoverBackground);
+        }
     }
 
 
-    /* Theme colors */
-    /* --sw-table-mint-light: hsla(150, 40%, 85%, 0.2);
-    --sw-table-mint-dark: hsla(150, 40%, 55%, 0.2);
-    --sw-table-mint-accent: hsla(0, 100%, 40%, 1);
 
-    --sw-table-ice-light: hsla(200, 100%, 90%, 0.2);
-    --sw-table-ice-dark: hsla(200, 100%, 70%, 0.2);
-    --sw-table-ice-accent: rgb(0, 255, 208); */
+
     /* Default theme  */
     --font: normal 1em Helvetica,
     Arial,
@@ -202,22 +251,17 @@
     --outerBorderColor: #fff;
     --theadBackgroundColor: var(--rowOddBackgroundColor);
     --tfootBackgroundColor: var(--rowOddBackgroundColor);
-    --checkboxColor: purple;
-}
+    --checkboxColor: lightblue;
+    --dragColor: #e8f4f8;
+    --buttonHoverBackground: lightblue;
 
-.sw-table[data-sw-table-theme="mint"] {
-    --font: normal 1em Helvetica, Arial, sans-serif;
-    --fontColor: green;
-    --iconColor: var(--fontColor);
-    --rowEvenBackgroundColor: white;
-    --rowHoverBackgroundColor: #f5f5f5;
-    --rowHoverFontColor: var(--fontColor);
-    --rowHoverIconColor: var(--fontColor);
-    --detailBackgroundColor: #e8f4f8;
-    --boxShadow: 0px 0px 3px 3px #f5f5f5;
-    --buttonFocusColor: darkblue;
-    --innerBorderColor: #ccc;
-    --outerBorderColor: #ccc;
-    --theadBackgroundColor: #e8f4f8;
-    --tfootBackgroundColor: #e8f4f8;
+
+
+    &[data-sw-table-theme="mint"] {
+
+    }
+
+    &[data-sw-table-theme="ice"] {
+        
+    }
 }

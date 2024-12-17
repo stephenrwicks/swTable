@@ -1,5 +1,3 @@
-
-import { css } from './css.js';
 import { Detail } from './detail.js';
 import { Actions } from './actions.js';
 import { icons } from './icons.js';
@@ -10,8 +8,6 @@ export { Row };
 class Row {
 
     #observable = new Observable();
-    detailButton: HTMLButtonElement | null = null;
-
 
     rowId = crypto.randomUUID();
     cells: { [key: string]: HTMLTableCellElement | null } = {
@@ -19,6 +15,10 @@ class Row {
         checkbox: null,
         actions: null
     };
+
+    constructor() {
+        this.#tr.dataset.uuid = this.rowId;
+    }
 
 
     get #table() {
@@ -28,6 +28,10 @@ class Row {
     get index() {
         if (!this.#table) return -1;
         return this.#table.rows.indexOf(this);
+    }
+
+    moveTo(index: number) {
+        // We wouldn't want this to work the same way as columns. SortOrder also doesn't exist
     }
 
     render() {
@@ -63,6 +67,7 @@ class Row {
     }
 
     detail: Detail | null = null;
+    detailButton: HTMLButtonElement | null = null;
     // These are rendering the contents, not the cells
     renderDetail() {
         if (!this.#table) return;
@@ -79,7 +84,8 @@ class Row {
             if (this.detailButton === null) {
                 this.detailButton = document.createElement('button');
                 this.detailButton.type = 'button';
-                this.detailButton.classList.add(css.button, css.detailButton);
+                this.detailButton.title = 'Toggle Details';
+                this.detailButton.classList.add('sw-table-button', 'sw-table-detail-button', 'sw-table-button-circle');
                 this.detailButton.append(icons.chevron());
                 this.detailButton.addEventListener('click', () => this.toggleDetail());
                 this.cells.detail?.append(this.detailButton);
@@ -91,8 +97,13 @@ class Row {
         if (!this.#table) return;
         if (typeof this.#table.checkboxFn === 'function' && this.#table.checkboxFn(this)) {
             this.checkbox ??= document.createElement('input');
-            this.checkbox.classList.add(css.checkbox);
+            this.checkbox.classList.add('sw-table-checkbox');
             this.checkbox.type = 'checkbox';
+            this.tr.dataset.isChecked = String(!!this.checkbox?.checked);
+            this.checkbox.addEventListener('change', () => {
+                this.#table?.updateSelectAllCheckbox();
+                this.tr.dataset.isChecked = String(!!this.checkbox?.checked);
+            });
             this.cells.checkbox?.append(this.checkbox);
         }
         else {
@@ -120,7 +131,8 @@ class Row {
             if (this.actionsButton === null) {
                 this.actionsButton = document.createElement('button');
                 this.actionsButton.type = 'button';
-                this.actionsButton.classList.add(css.button, 'sw-table-actions-button');
+                this.actionsButton.title = 'Toggle Actions';
+                this.actionsButton.classList.add('sw-table-button', 'sw-table-actions-button', 'sw-table-button-circle');
                 this.actionsButton.append(icons.ellipsis());
                 this.actionsButton.addEventListener('click', () => this.toggleActions());
                 this.cells.actions?.append(this.actionsButton);
@@ -222,17 +234,20 @@ class Row {
     }
 
     destroy() {
-        // Need to update the page counter without re-rendering
         this.#table?.rows.splice(this.index, 1);
         this.detail = null;
+        if (this.checkbox) this.#table?.updateSelectAllCheckbox();
         this.checkbox = null;
         if (this.#actions) actionsToRow.delete(this.#actions);
         this.#actions = null;
-        rowToTable.delete(this);
         this.#tr.remove();
         this.#tr = null as any;
         this.#observable.destroy();
         this.#observable = null as any;
+        this.detailButton = null;
+        this.actionsButton = null;
+        this.#table?.goToPage(this.#table.currentPage);
+        rowToTable.delete(this);
     }
 
 }

@@ -1,4 +1,3 @@
-import { css } from "./css.js";
 export { Detail };
 
 class Detail {
@@ -8,7 +7,7 @@ class Detail {
 
     constructor() {
         this.tr.append(this.#td);
-        this.tr.classList.add(css.detailTr);
+        this.tr.classList.add('sw-table-detail-tr');
     }
 
     render(contents: Element | string, colSpan: number) {
