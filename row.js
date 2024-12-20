@@ -43,6 +43,7 @@ class Row {
             const td = this.cells[column.colId];
             if (!td)
                 throw new Error('SwTable row render');
+            td.headers = `_${column.colId}`;
             if (column.render)
                 td.replaceChildren(column.render(this));
             // Somehow detect if the new re-rendered element in this cell is the same as the one that was focused

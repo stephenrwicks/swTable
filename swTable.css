@@ -87,9 +87,9 @@
         }
 
         &:has(+.sw-table-detail-tr) {
-            border-top: 1px solid var(--innerBorderColor);
-            border-left: 1px solid var(--innerBorderColor);
-            border-right: 1px solid var(--innerBorderColor);
+            /* border-top: 1px solid var(--innerBorderColor); */
+            /* border-left: 1px solid var(--innerBorderColor);
+            border-right: 1px solid var(--innerBorderColor); */
 
             .sw-table-detail-button .sw-table-icon {
                 rotate: 90deg;

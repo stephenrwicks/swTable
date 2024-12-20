@@ -14,6 +14,9 @@
 // Improve column drag
 // Automatic init
 // Init from html
+// Add row button, add row dialog
+// aria-live
+// observable memoization, also oldvalue newvalue stuff
 
 import { Column, ColumnSettings, BuiltInColumn } from './column.js';
 import { Row } from './row.js';
@@ -294,7 +297,6 @@ class Table {
             }
             this.#els.headerDiv.append(this.#els.pageLengthSelect);
         }
-        console.log('x');
     }
 
     #showSearch = false;
@@ -681,7 +683,7 @@ const data = [
 ];
 
 //@ts-ignore
-window.x = new Table({
+window.xx = new Table({
     // pageLength: 4,
     pageLengthOptions: [5, 10],
     columns: [
@@ -783,5 +785,122 @@ window.q = new Table({
     // showSearch: true,
     theme: 'ice',
 });
+//@ts-ignore
+window.x = new Table({
+    pageLength: 5,
+    pageLengthOptions: [5, 10, 15],
+    columns: [
+        {
+            name: 'Name',
+            render: (row) => {
+                if (row.data.isActive) {
+                    return row.data.profile.name;
+                }
+                const el = document.createElement('span');
+                el.style.textDecoration = 'line-through';
+                el.textContent = row.data.profile.name;
+                return el;
+            }
+        },
+        {
+            name: 'Age',
+            render: (row) => row.data.isActive ? row.data.profile.age.toString() : 'N/A'
+        },
+        {
+            name: 'City',
+            render: (row) => {
+                if (row.data.isActive) {
+                    const el = document.createElement('span');
+                    el.textContent = `${row.data.location.city}, ${row.data.location.state}`;
+                    return el;
+                }
+                return 'Hidden';
+            }
+        },
+        {
+            name: 'Occupation',
+            render: (row) => row.data.isActive ? row.data.profile.occupation : 'Inactive'
+        },
+        {
+            name: 'Status',
+            render: (row) => {
+                const el = document.createElement('button');
+                el.textContent = row.data.isActive ? 'Active' : 'Inactive';
+                el.style.backgroundColor = row.data.isActive ? 'green' : 'red';
+                el.style.color = 'white';
+                el.onclick = () => row.data.isActive = !row.data.isActive;
+                return el;
+            }
+        }
+    ],
+    data: Array.from({ length: 15 }, (_, i) => ({
+        id: i + 1,
+        profile: {
+            name: [
+                'Alice Johnson',
+                'Bob Smith',
+                'Charlotte Brown',
+                'Daniel Wilson',
+                'Ella Martinez',
+                'Frank Garcia',
+                'Grace Thompson',
+                'Henry White',
+                'Isla Clark',
+                'Jack Lewis',
+                'Kylie Hall',
+                'Liam Adams',
+                'Mia Baker',
+                'Noah Nelson',
+                'Olivia Perez'
+            ][i],
+            age: Math.floor(Math.random() * 40 + 20),
+            occupation: i % 2 === 0 ? 'Engineer' : 'Designer'
+        },
+        location: {
+            city: i % 3 === 0 ? 'New York' : i % 3 === 1 ? 'Los Angeles' : 'Chicago',
+            state: i % 3 === 0 ? 'NY' : i % 3 === 1 ? 'CA' : 'IL'
+        },
+        isActive: i % 2 === 0
+    })),
+    detailFn: (row) => {
+        const container = document.createElement('div');
+        container.style.padding = '10px';
+        container.style.backgroundColor = '#f9f9f9';
+        container.style.border = '1px solid #ddd';
+
+        const title = document.createElement('h4');
+        title.textContent = `Details for ${row.data.profile.name}`;
+        container.appendChild(title);
+
+        const detailsList = document.createElement('ul');
+        detailsList.innerHTML = `
+            <li>Age: ${row.data.isActive ? row.data.profile.age : 'N/A'}</li>
+            <li>Occupation: ${row.data.isActive ? row.data.profile.occupation : 'Inactive'}</li>
+            <li>City: ${row.data.isActive ? `${row.data.location.city}, ${row.data.location.state}` : 'Hidden'}</li>
+            <li>Status: ${row.data.isActive ? 'Active' : 'Inactive'}</li>
+        `;
+        container.appendChild(detailsList);
+
+        return container;
+    },
+    checkboxFn: (row) => row.data.profile.age > 30,
+    actionsFn: (row) => [
+        {
+            text: 'Change Name',
+            fn: () => {
+                const newName = prompt(`Enter new name for ${row.data.profile.name}:`, row.data.profile.name);
+                if (newName) row.data.profile.name = newName;
+            }
+        },
+        {
+            text: 'Delete',
+            fn: () => row.destroy()
+        }
+    ],
+    showSearch: true,
+
+});
+
+
 //@ts-ignore
 document.body.append(window.x.element);

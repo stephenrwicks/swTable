@@ -25,6 +25,8 @@ class Column {
         thButton.classList.add('sw-table-button');
         thButton.append(span, chevron);
         this.th.append(thButton);
+        this.th.id = `_${this.colId}`;
+        this.th.scope = 'col';
         this.th.dataset.isAscending = 'false';
         this.th.dataset.isCurrentSort = 'false';
         //this.isReactive = typeof settings.isReactive === 'boolean' ? settings.isReactive : true;
@@ -66,18 +68,6 @@ class Column {
         });
     }
 
-    // Could we just add class?
-    // addHoverEffect(color: string) {
-    //     this.th.addEventListener('mouseover', () => {
-    //         this.th.style.backgroundColor = color;
-    //         for (const cell of this.cellsCurrentPage ?? []) cell.style.backgroundColor = color;
-    //     });
-    //     this.th.addEventListener('mouseout', () => {
-    //         this.th.style.backgroundColor = '';
-    //         for (const cell of this.cellsCurrentPage ?? []) cell.style.backgroundColor = '';
-    //     });
-    // }
-
     // #isReactive = true;
     // get isReactive() {
     //     return this.#isReactive;
@@ -101,7 +91,7 @@ class Column {
         if (!table) return;
 
         for (const row of table.rows) {
-            // Probably a cheaper way to do this
+            // Probably a cheaper way to do this. Can we target down the cells only?
             row.render();
         }
     }
@@ -123,6 +113,15 @@ class Column {
     get cellsCurrentPage() {
         if (!this.#table) return [];
         return this.#table.rowsCurrentPage.map(row => row.cells[this.colId]) as Array<HTMLTableCellElement>;
+    }
+
+
+    moveLeft() {
+        return this.moveTo(this.sortOrder - 1);
+    }
+
+    moveRight() {
+        return this.moveTo(this.sortOrder + 1);
     }
 
     moveTo(index: number) {
@@ -153,9 +152,7 @@ class Column {
         });
         table.renderColumnTr();
         for (const row of table.rows) row.render();
-        // for (const column of table.columns) {
-        //     console.log(column.sortOrder);
-        // }
+        return this.sortOrder;
     }
 
     destroy() {
