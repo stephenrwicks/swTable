@@ -14,19 +14,16 @@ class Observable<T extends object> {
     // Memoization. This WeakMap stores nested proxies so that they only have to be created once
     #cache = new WeakMap<any, any>();
 
-    createNestedProxy(obj: T, path: Array<string | symbol> = []): any {
+    #createNestedProxy(obj: T, path: Array<string | symbol> = []): any {
+
         if (this.#cache.has(obj)) return this.#cache.get(obj); // Return cached proxy if available
+
         const handler: ProxyHandler<any> = {
             get: (target, property, receiver) => {
-                //@ts-ignore
-                // window.getCount++;
-                // //@ts-ignore
-                // console.log(window.getCount);
                 const value = Reflect.get(target, property, receiver);
                 if (value === null || typeof value === 'undefined') return value;
-                // Returns nested proxy of generic objects and arrays, but not Dates or custom classes, etc.
                 if (Array.isArray(value) || Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null) {
-                    return this.createNestedProxy(value, [...path, property]);
+                    return this.#createNestedProxy(value, [...path, property]);
                 }
                 return value;
             },
@@ -41,14 +38,14 @@ class Observable<T extends object> {
             },
         };
         const proxy = new Proxy(obj, handler);
-        console.log('new proxy created'); // If we use cache, this line is never reached after initialization
+        //console.log('new proxy created', obj); // If we use cache, this line is never reached after initialization
         this.#cache.set(obj, proxy);
         return proxy; // Return a new proxy object
     }
 
     #fireCallbacks(key: string | symbol, oldPropValue: any, newPropValue: any) {
         // Also pass down key?
-        console.log(key, oldPropValue, newPropValue);
+        //console.log(key, oldPropValue, newPropValue);
         for (const callback of this.#callbacks) {
             callback();
         }
@@ -66,11 +63,11 @@ class Observable<T extends object> {
 
     set target(target: T) {
         this.#target = target;
-        this.#proxy = this.createNestedProxy(target);
+        this.#proxy = this.#createNestedProxy(target);
     }
 
-    #callbacks: Array<() => void> = [];
-    get callbacks(): Array<() => void> {
+    #callbacks: Array<() => any> = [];
+    get callbacks(): Array<() => any> {
         return this.#callbacks;
     }
     set callbacks(callbacks: Array<() => void>) {

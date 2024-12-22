@@ -206,6 +206,23 @@ class Column {
         this.th.dataset.isCurrentSort = String(this.#isCurrentSort);
         this.#table.goToPage(1);
     }
+    #isShowing = true;
+    show() {
+        if (this.#isShowing)
+            return;
+        this.#isShowing = true;
+    }
+    hide() {
+        if (!this.#isShowing)
+            return;
+        this.#isShowing = false;
+    }
+    toggle() {
+        if (this.#isShowing)
+            this.hide();
+        else
+            this.show();
+    }
 }
 class BuiltInColumn {
     th = document.createElement('th');

@@ -1,10 +1,11 @@
-// Paging buttons, paging dropdown
+// Figure out data vs $data api
+// Paging buttons, paging dropdown - placement?
 // Filters, FilterBox, FilterModal? -- Use sliders icon
 // show/hide column options
 // Fix colspan issues
 // CSS Themes and additions, icon hovers
 // Horizontal scroll + resizable
-// Generic typed data
+// Generic typed data - big lift possibly
 // Functional actions button disabled
 // Row actions setter
 // Move / drag row
@@ -17,15 +18,18 @@
 // Add row button, add row dialog
 // aria-live
 // observable memoization, also oldvalue newvalue stuff
+// make dragover have one listener that is applied to the entire table / thead + tbody. locates column to swap
+// Custom events. Like pass up rowClick, etc to element
+// onRender() callback on row, onDataChange()
 
 import { Column, ColumnSettings, BuiltInColumn } from './column.js';
 import { Row } from './row.js';
 import { rowToTable, columnToTable } from './weakMaps.js';
 import { ActionSettings } from './actions.js';
 import { icons } from './icons.js';
-export { Table };
+export { SwTable };
 
-type TableSettings = {
+type SwTableSettings = {
     columns: Array<ColumnSettings>;
     theme?: 'mint' | 'ice';
     data?: Array<any>;
@@ -37,7 +41,7 @@ type TableSettings = {
     actionsFn?(row: Row): ActionSettings | null;
 }
 
-class Table {
+class SwTable {
 
     #els = {
         wrapper: document.createElement('div'),
@@ -57,14 +61,14 @@ class Table {
         pageLengthSelect: document.createElement('select'),
         selectAllCheckbox: document.createElement('input'),
     };
-
-    columnsObject: { [key: string]: Column | BuiltInColumn | null } = {
+    
+    columnsObject: Record<string, Column | BuiltInColumn | null> = {
         detail: null,
         checkbox: null,
         actions: null
     };
 
-    constructor(settings: TableSettings) {
+    constructor(settings: SwTableSettings) {
         if (!settings?.columns) throw new Error('SwTable - no columns defined');
         settings.columns.forEach((colSetting, index) => {
             const column = new Column(colSetting);
@@ -77,11 +81,6 @@ class Table {
         if (typeof settings.actionsFn === 'function') this.actionsFn = settings.actionsFn;
         if (typeof settings.checkboxFn === 'function') this.checkboxFn = settings.checkboxFn;
         this.renderColumnTr();
-        if (settings.data?.length) {
-            for (const datum of settings.data) {
-                this.insertRow(datum);
-            }
-        }
 
         this.pageLengthOptions = settings.pageLengthOptions ?? [0];
 
@@ -133,15 +132,12 @@ class Table {
         this.#els.prevPageButton.addEventListener('click', () => this.goToPage(this.currentPage - 1));
         this.#els.nextPageButton.append(icons.chevron());
         this.#els.prevPageButton.append(icons.chevron());
+
+        if (Array.isArray(settings.data) && settings.data.length) this.setData(settings.data);
+
     }
 
     setData(data: Array<any>) {
-        this.data = data;
-    }
-    get data() {
-        return this.rows.map(row => row.data);
-    }
-    set data(data: Array<any>) {
         while (this.rows.length) {
             this.rows[0].destroy();
         }
@@ -150,8 +146,13 @@ class Table {
         }
         this.goToPage(1);
     }
-    get dataTarget() {
-        return this.rows.map(row => row.dataTarget);
+
+    get $data() {
+        return this.rows.map(row => row.$data);
+    }
+
+    get data() {
+        return this.rows.map(row => row.data);
     }
     get dataSnapshot() {
         return this.rows.map(row => row.dataSnapshot);
@@ -196,10 +197,10 @@ class Table {
         // Fewer loops
     }
 
-    insertRow(data: any, index?: number) {
+    insertRow(data: any, index?: number): Row {
         const row = new Row();
         rowToTable.set(row, this);
-        row.data = data;
+        row.$data = data;
         if (typeof index === 'number' && this.#rows.length) {
             this.#rows[index].tr.before(row.tr);
             this.#rows.splice(index, 0, row);
@@ -208,15 +209,15 @@ class Table {
             this.#rows.push(row);
             this.#els.tbody.append(row.tr);
         }
-
+        return row;
     }
 
     // This is where the detailRow is defined
-    #detailFn: TableSettings['detailFn'] | null = null;
+    #detailFn: SwTableSettings['detailFn'] | null = null;
     get detailFn() {
         return this.#detailFn;
     }
-    set detailFn(fn: TableSettings['detailFn'] | null) {
+    set detailFn(fn: SwTableSettings['detailFn'] | null) {
         this.#detailFn = fn;
         if (typeof this.#detailFn === 'function') {
             this.columnsObject.detail ??= new BuiltInColumn('detail');
@@ -233,11 +234,11 @@ class Table {
 
     }
 
-    #checkboxFn: TableSettings['checkboxFn'] | null = null;
+    #checkboxFn: SwTableSettings['checkboxFn'] | null = null;
     get checkboxFn() {
         return this.#checkboxFn;
     }
-    set checkboxFn(fn: TableSettings['checkboxFn'] | null) {
+    set checkboxFn(fn: SwTableSettings['checkboxFn'] | null) {
         this.#checkboxFn = fn;
         if (typeof this.#checkboxFn === 'function') {
             this.columnsObject.checkbox ??= new BuiltInColumn('checkbox');
@@ -252,11 +253,11 @@ class Table {
         for (const row of this.rows) row.render();
     }
 
-    #actionsFn: TableSettings['actionsFn'] | null = null;
+    #actionsFn: SwTableSettings['actionsFn'] | null = null;
     get actionsFn() {
         return this.#actionsFn;
     }
-    set actionsFn(fn: TableSettings['actionsFn'] | null) {
+    set actionsFn(fn: SwTableSettings['actionsFn'] | null) {
         this.#actionsFn = fn;
         if (typeof this.#actionsFn === 'function') {
             this.columnsObject.actions ??= new BuiltInColumn('actions');
@@ -430,477 +431,3 @@ class Table {
         if (this.columnsObject.checkbox) this.#els.columnTr.append(this.columnsObject.checkbox.th);
     }
 }
-
-// Lazy render can't really work because it breaks search if search is checking text
-// const data = [
-//     {
-//         id: 1,
-//         name: 'Alice',
-//         age: 28,
-//         city: 'Boston',
-//         address: {
-//             street: '123 Main St',
-//             zipCode: '02118',
-//         },
-//         hobbies: ['reading', 'cycling'],
-//         employment: {
-//             company: 'TechCorp',
-//             role: 'Engineer',
-//             tenure: 3, // years
-//         },
-//     },
-//     {
-//         id: 2,
-//         name: 'Bob',
-//         age: 34,
-//         city: 'Los Angeles',
-//         address: {
-//             street: '456 Elm St',
-//             zipCode: '90001',
-//         },
-//         hobbies: ['photography', 'cooking', 'hiking'],
-//         employment: {
-//             company: 'MediaHub',
-//             role: 'Content Creator',
-//             tenure: 5, // years
-//         },
-//     },
-//     {
-//         id: 3,
-//         name: 'Charlie',
-//         age: 25,
-//         city: 'Chicago',
-//         address: {
-//             street: '789 Oak Ave',
-//             zipCode: '60611',
-//         },
-//         hobbies: ['gaming', 'basketball'],
-//         employment: {
-//             company: 'AdSolutions',
-//             role: 'Analyst',
-//             tenure: 1, // years
-//         },
-//     },
-//     {
-//         id: 4,
-//         name: 'Diana',
-//         age: 29,
-//         city: 'Houston',
-//         address: {
-//             street: '321 Pine Rd',
-//             zipCode: '77002',
-//         },
-//         hobbies: ['painting', 'yoga'],
-//         employment: {
-//             company: 'HealthFirst',
-//             role: 'Nurse',
-//             tenure: 4, // years
-//         },
-//     },
-// ];
-
-const data = [
-    {
-        id: 1,
-        revenue: 1200.50,
-        expenses: 450.75,
-        details: {
-            category: "Retail",
-            region: "North"
-        }
-    },
-    {
-        id: 2,
-        revenue: 980.00,
-        expenses: 300.50,
-        details: {
-            category: "Wholesale",
-            region: "West"
-        }
-    },
-    {
-        id: 3,
-        revenue: 1500.75,
-        expenses: 700.25,
-        details: {
-            category: "Online",
-            region: "East"
-        }
-    },
-    {
-        id: 4,
-        revenue: 2000.00,
-        expenses: 1200.00,
-        details: {
-            category: "Corporate",
-            region: "South"
-        }
-    },
-    {
-        id: 5,
-        revenue: 850.25,
-        expenses: 400.50,
-        details: {
-            category: "Retail",
-            region: "Central"
-        }
-    },
-    {
-        id: 1,
-        revenue: 1200.50,
-        expenses: 450.75,
-        details: {
-            category: "Retail",
-            region: "North"
-        }
-    },
-    {
-        id: 2,
-        revenue: 980.00,
-        expenses: 300.50,
-        details: {
-            category: "Wholesale",
-            region: "West"
-        }
-    },
-    {
-        id: 3,
-        revenue: 1500.75,
-        expenses: 700.25,
-        details: {
-            category: "Online",
-            region: "East"
-        }
-    },
-    {
-        id: 4,
-        revenue: 2000.00,
-        expenses: 1200.00,
-        details: {
-            category: "Corporate",
-            region: "South"
-        }
-    },
-    {
-        id: 5,
-        revenue: 850.25,
-        expenses: 400.50,
-        details: {
-            category: "Retail",
-            region: "Central"
-        }
-    },
-    {
-        id: 1,
-        revenue: 1200.50,
-        expenses: 450.75,
-        details: {
-            category: "Retail",
-            region: "North"
-        }
-    },
-    {
-        id: 2,
-        revenue: 980.00,
-        expenses: 300.50,
-        details: {
-            category: "Wholesale",
-            region: "West"
-        }
-    },
-    {
-        id: 3,
-        revenue: 1500.75,
-        expenses: 700.25,
-        details: {
-            category: "Online",
-            region: "East"
-        }
-    },
-    {
-        id: 4,
-        revenue: 2000.00,
-        expenses: 1200.00,
-        details: {
-            category: "Corporate",
-            region: "South"
-        }
-    },
-    {
-        id: 5,
-        revenue: 850.25,
-        expenses: 400.50,
-        details: {
-            category: "Retail",
-            region: "Central"
-        }
-    },
-    {
-        id: 1,
-        revenue: 1200.50,
-        expenses: 450.75,
-        details: {
-            category: "Retail",
-            region: "North"
-        }
-    },
-    {
-        id: 2,
-        revenue: 980.00,
-        expenses: 300.50,
-        details: {
-            category: "Wholesale",
-            region: "West"
-        }
-    },
-    {
-        id: 3,
-        revenue: 1500.75,
-        expenses: 700.25,
-        details: {
-            category: "Online",
-            region: "East"
-        }
-    },
-    {
-        id: 4,
-        revenue: 2000.00,
-        expenses: 1200.00,
-        details: {
-            category: "Corporate",
-            region: "South"
-        }
-    },
-    {
-        id: 5,
-        revenue: 850.25,
-        expenses: 400.50,
-        details: {
-            category: "Retail",
-            region: "Central"
-        }
-    },
-];
-
-//@ts-ignore
-window.xx = new Table({
-    // pageLength: 4,
-    pageLengthOptions: [5, 10],
-    columns: [
-        {
-            name: 'ID',
-            render(row) {
-                return row.data.id;
-            }
-        },
-        {
-            name: 'Revenue',
-            render(row) {
-                return row.data.revenue.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-            }
-        },
-        {
-            name: 'Expenses',
-            render(row) {
-                return row.data.expenses.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-            },
-            sortBy: null
-        },
-        {
-            name: 'Net',
-            render(row) {
-                return (row.data.revenue - row.data.expenses).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-            }
-        },
-    ],
-    data: data,
-    detailFn(row) {
-        return 'x';
-    },
-    checkboxFn(row) {
-        return row.data.id > 2;
-    },
-    actionsFn(row) {
-        return [
-            {
-                text: 'Set Revenue',
-                fn() {
-                    row.data.revenue = Number(prompt('Revenue was:'));
-                }
-            },
-            {
-                text: 'Delete Row',
-                fn() {
-                    row.destroy();
-                }
-            }
-        ]
-    },
-    showSearch: true,
-    theme: 'ice',
-});
-//@ts-ignore
-
-// Seems like every time data changes, you should re-sort and re-filter
-window.q = new Table({
-    pageLength: 10,
-    pageLengthOptions: [5, 12],
-    columns: [
-        {
-            name: 'count',
-            render(row) {
-                return row.data.count;
-            }
-        },
-        {
-            name: 'button',
-            render(row) {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.textContent = `Increase count: ${row.data.count}`;
-                btn.addEventListener('click', () => row.data.count++);
-                return btn;
-            }
-        },
-        {
-            name: 'button',
-            render(row) {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.textContent = `Increase count by 10: ${row.data.count}`;
-                btn.addEventListener('click', () => row.data.count = row.data.count + 10);
-                return btn;
-            }
-        },
-
-    ],
-    data: [
-        {
-            count: 1
-        },
-        {
-            count: 100
-        }
-    ],
-    // showSearch: true,
-    theme: 'ice',
-});
-//@ts-ignore
-window.x = new Table({
-    pageLength: 5,
-    pageLengthOptions: [5, 10, 15],
-    columns: [
-        {
-            name: 'Name',
-            render: (row) => {
-                if (row.data.isActive) {
-                    return row.data.profile.name;
-                }
-                const el = document.createElement('span');
-                el.style.textDecoration = 'line-through';
-                el.textContent = row.data.profile.name;
-                return el;
-            }
-        },
-        {
-            name: 'Age',
-            render: (row) => row.data.isActive ? row.data.profile.age.toString() : 'N/A'
-        },
-        {
-            name: 'City',
-            render: (row) => {
-                if (row.data.isActive) {
-                    const el = document.createElement('span');
-                    el.textContent = `${row.data.location.city}, ${row.data.location.state}`;
-                    return el;
-                }
-                return 'Hidden';
-            }
-        },
-        {
-            name: 'Occupation',
-            render: (row) => row.data.isActive ? row.data.profile.occupation : 'Inactive'
-        },
-        {
-            name: 'Status',
-            render: (row) => {
-                const el = document.createElement('button');
-                el.textContent = row.data.isActive ? 'Active' : 'Inactive';
-                el.style.backgroundColor = row.data.isActive ? 'green' : 'red';
-                el.style.color = 'white';
-                el.onclick = () => row.data.isActive = !row.data.isActive;
-                return el;
-            }
-        }
-    ],
-    data: Array.from({ length: 15 }, (_, i) => ({
-        id: i + 1,
-        profile: {
-            name: [
-                'Alice Johnson',
-                'Bob Smith',
-                'Charlotte Brown',
-                'Daniel Wilson',
-                'Ella Martinez',
-                'Frank Garcia',
-                'Grace Thompson',
-                'Henry White',
-                'Isla Clark',
-                'Jack Lewis',
-                'Kylie Hall',
-                'Liam Adams',
-                'Mia Baker',
-                'Noah Nelson',
-                'Olivia Perez'
-            ][i],
-            age: Math.floor(Math.random() * 40 + 20),
-            occupation: i % 2 === 0 ? 'Engineer' : 'Designer'
-        },
-        location: {
-            city: i % 3 === 0 ? 'New York' : i % 3 === 1 ? 'Los Angeles' : 'Chicago',
-            state: i % 3 === 0 ? 'NY' : i % 3 === 1 ? 'CA' : 'IL'
-        },
-        isActive: i % 2 === 0
-    })),
-    detailFn: (row) => {
-        const container = document.createElement('div');
-        container.style.padding = '10px';
-        container.style.backgroundColor = '#f9f9f9';
-        container.style.border = '1px solid #ddd';
-
-        const title = document.createElement('h4');
-        title.textContent = `Details for ${row.data.profile.name}`;
-        container.appendChild(title);
-
-        const detailsList = document.createElement('ul');
-        detailsList.innerHTML = `
-            <li>Age: ${row.data.isActive ? row.data.profile.age : 'N/A'}</li>
-            <li>Occupation: ${row.data.isActive ? row.data.profile.occupation : 'Inactive'}</li>
-            <li>City: ${row.data.isActive ? `${row.data.location.city}, ${row.data.location.state}` : 'Hidden'}</li>
-            <li>Status: ${row.data.isActive ? 'Active' : 'Inactive'}</li>
-        `;
-        container.appendChild(detailsList);
-
-        return container;
-    },
-    checkboxFn: (row) => row.data.profile.age > 30,
-    actionsFn: (row) => [
-        {
-            text: 'Change Name',
-            fn: () => {
-                const newName = prompt(`Enter new name for ${row.data.profile.name}:`, row.data.profile.name);
-                if (newName) row.data.profile.name = newName;
-            }
-        },
-        {
-            text: 'Delete',
-            fn: () => row.destroy()
-        }
-    ],
-    showSearch: true,
-
-});
-
-
-//@ts-ignore
-document.body.append(window.x.element);

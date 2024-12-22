@@ -5,6 +5,7 @@ import { Observable } from './observable.js';
 import { rowToTable, actionsToRow } from './weakMaps.js';
 export { Row };
 class Row {
+    // Needs to be typed with a generic
     #observable = new Observable();
     rowId = crypto.randomUUID();
     cells = {
@@ -143,18 +144,19 @@ class Row {
     get tr() {
         return this.#tr;
     }
-    get data() {
+    // The table should be displaying the target, not the proxied data.
+    get $data() {
         if (!this.#observable)
             return;
         return this.#observable.proxy;
     }
-    set data(data) {
+    set $data(data) {
         this.#observable.target = data;
         this.#observable.callbacks = [];
         this.#observable.callbacks.push(this.render.bind(this));
         this.render();
     }
-    get dataTarget() {
+    get data() {
         return this.#observable.target;
     }
     get dataSnapshot() {

@@ -7,7 +7,8 @@ export { Row };
 
 class Row {
 
-    #observable = new Observable();
+    // Needs to be typed with a generic
+    #observable = new Observable<any>();
 
     rowId = crypto.randomUUID();
     cells: { [key: string]: HTMLTableCellElement | null } = {
@@ -146,19 +147,21 @@ class Row {
         return this.#tr;
     }
 
-    get data(): any {
+    // The table should be displaying the target, not the proxied data.
+
+    get $data(): any {
         if (!this.#observable) return;
         return this.#observable.proxy;
     }
 
-    set data(data) {
+    set $data(data) {
         this.#observable.target = data;
         this.#observable.callbacks = [];
         this.#observable.callbacks.push(this.render.bind(this));
         this.render();
     }
 
-    get dataTarget() {
+    get data() {
         return this.#observable.target;
     }
 

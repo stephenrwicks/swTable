@@ -1,8 +1,8 @@
-import { Table } from "./table.js";
+import { SwTable } from "./table.js";
 
 class FilterModal {
-    table: Table;
-    constructor(table: Table) {
+    table: SwTable;
+    constructor(table: SwTable) {
         this.table = table;
         const dialog = document.createElement('dialog');
     }
