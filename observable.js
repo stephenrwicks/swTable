@@ -1,13 +1,9 @@
 export { Observable };
-//@ts-ignore
-// window.getCount = 0;
 class Observable {
     constructor(target) {
-        // Setting target triggers createNestedProxy
-        if (target)
-            this.target = target;
+        this.#target = target;
+        this.#proxy = this.#createNestedProxy(target);
     }
-    // What if you set the value of an entire subobject?
     // Memoization. This WeakMap stores nested proxies so that they only have to be created once
     #cache = new WeakMap();
     #createNestedProxy(obj, path = []) {
@@ -34,9 +30,8 @@ class Observable {
             },
         };
         const proxy = new Proxy(obj, handler);
-        //console.log('new proxy created', obj); // If we use cache, this line is never reached after initialization
         this.#cache.set(obj, proxy);
-        return proxy; // Return a new proxy object
+        return proxy;
     }
     #fireCallbacks(key, oldPropValue, newPropValue) {
         // Also pass down key?

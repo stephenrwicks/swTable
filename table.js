@@ -5,14 +5,14 @@
 // Fix colspan issues
 // CSS Themes and additions, icon hovers
 // Horizontal scroll + resizable
-// Generic typed data - big lift possibly
+// Generic typed data - big lift possibly - do this
 // Functional actions button disabled
 // Row actions setter
 // Move / drag row
 // Lazy render
 // Editable, crud modal, etc.
 // Preserving focus
-// Improve column drag
+// Improve column draginsert
 // Automatic init
 // Init from html
 // Add row button, add row dialog
@@ -104,8 +104,8 @@ class SwTable {
         this.#els.prevPageButton.type = 'button';
         this.#els.nextPageButton.title = 'Next Page';
         this.#els.prevPageButton.title = 'Previous Page';
-        this.#els.prevPageButton.classList.add('sw-table-button', 'sw-table-prev-page-button', 'sw-table-button-circle');
-        this.#els.nextPageButton.classList.add('sw-table-button', 'sw-table-next-page-button', 'sw-table-button-circle');
+        this.#els.prevPageButton.className = 'sw-table-button sw-table-prev-page-button sw-table-button-circle';
+        this.#els.nextPageButton.className = 'sw-table-button sw-table-next-page-button sw-table-button-circle';
         this.#els.nextPageButton.addEventListener('click', () => this.goToPage(this.currentPage + 1));
         this.#els.prevPageButton.addEventListener('click', () => this.goToPage(this.currentPage - 1));
         this.#els.nextPageButton.append(icons.chevron());
@@ -114,6 +114,10 @@ class SwTable {
             this.setData(settings.data);
     }
     setData(data) {
+        if (!Array.isArray(data)) {
+            console.error('setData');
+            return;
+        }
         while (this.rows.length) {
             this.rows[0].destroy();
         }
@@ -168,7 +172,7 @@ class SwTable {
     insertRow(data, index) {
         const row = new Row();
         rowToTable.set(row, this);
-        row.$data = data;
+        row.setData(data);
         if (typeof index === 'number' && this.#rows.length) {
             this.#rows[index].tr.before(row.tr);
             this.#rows.splice(index, 0, row);

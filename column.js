@@ -13,7 +13,7 @@ class Column {
         thButton.classList.add('sw-table-button');
         thButton.append(span, chevron);
         this.th.append(thButton);
-        this.th.id = `_${this.colId}`;
+        //this.th.id = `_${this.colId}`;
         this.th.scope = 'col';
         this.th.dataset.isAscending = 'false';
         this.th.dataset.isCurrentSort = 'false';
@@ -93,12 +93,12 @@ class Column {
     get cells() {
         if (!this.#table)
             return null;
-        return this.#table.rows.map(row => row.cells[this.colId]);
+        return this.#table.rows.map((row) => row.cells[this.colId]);
     }
     get cellsCurrentPage() {
         if (!this.#table)
             return [];
-        return this.#table.rowsCurrentPage.map(row => row.cells[this.colId]);
+        return this.#table.rowsCurrentPage.map((row) => row.cells[this.colId]);
     }
     moveLeft() {
         return this.moveTo(this.sortOrder - 1);
@@ -165,10 +165,12 @@ class Column {
         else {
             this.#sortBy = null;
         }
-        // Re-sort if we are already sorted by this column
         this.th.querySelector('button').onclick = isSortable ? () => this.sort() : null;
         //this.th.querySelector('button')!.disabled = !isSortable;
         this.th.dataset.isSortable = String(isSortable);
+        // Re-sort if we are already sorted by this column
+        if (this.#isCurrentSort)
+            this.sort(this.#isAscending);
     }
     #isAscending = false;
     #isCurrentSort = false;
@@ -195,7 +197,7 @@ class Column {
                 bVal = bVal instanceof HTMLElement ? bVal.innerText : String(bVal);
                 return !!ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
             }
-            // Sort by custom parameter
+            // Sort by custom function
             const aVal = String(this.#sortBy(a));
             const bVal = String(this.#sortBy(b));
             return !!ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);

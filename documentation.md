@@ -11,7 +11,7 @@ A reactive data grid utility for vanilla TS or JS.
 
 No dependencies.
 
-Automatically updates the DOM when data is modified.
+Automatically updates the DOM when data is modified, and automatically updates the DOM when settings are dynamically changed.
 
 Fully featured with
 - object-oriented data access,
@@ -166,6 +166,8 @@ _getter_
 
 Array of observed, nested proxy objects for each row.
 
+Collection of Row.$data.
+
 Updating these will update the DOM.
 
 ### `data: Array<any>`
@@ -173,6 +175,8 @@ Updating these will update the DOM.
 _getter_
 
 Array of plain data objects that represent each row's data.
+
+Collection of Row.data.
 
 These are proxy targets, so they are live. If the table's data is updated (via .$data), these objects will update wherever they are used.
 
@@ -230,7 +234,7 @@ Page index starts at 1, not 0, to match the interface.
 
 _getter / setter_
 
-Rows per page. Use 0 to display all rows.
+Rows per page. You can set this manually to change it. fUse 0 to display all rows.
 
 ### `pageLengthOptions: Array<number>`
 

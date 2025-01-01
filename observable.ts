@@ -1,25 +1,22 @@
 export { Observable };
-//@ts-ignore
-// window.getCount = 0;
 
-class Observable<T extends object> {
+type DataObject = Record<string, unknown>;
+class Observable<T extends DataObject> {
 
-    constructor(target?: T) {
-         // Setting target triggers createNestedProxy
-        if (target) this.target = target;
+    constructor(target: T) {
+        this.#target = target;
+        this.#proxy = this.#createNestedProxy(target);
     }
-
-    // What if you set the value of an entire subobject?
 
     // Memoization. This WeakMap stores nested proxies so that they only have to be created once
     #cache = new WeakMap<any, any>();
 
-    #createNestedProxy(obj: T, path: Array<string | symbol> = []): any {
+    #createNestedProxy(obj: DataObject, path: Array<string> = []): any {
 
         if (this.#cache.has(obj)) return this.#cache.get(obj); // Return cached proxy if available
 
-        const handler: ProxyHandler<any> = {
-            get: (target, property, receiver) => {
+        const handler: ProxyHandler<Record<string, any>> = {
+            get: (target, property: string, receiver) => {
                 const value = Reflect.get(target, property, receiver);
                 if (value === null || typeof value === 'undefined') return value;
                 if (Array.isArray(value) || Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null) {
@@ -27,7 +24,7 @@ class Observable<T extends object> {
                 }
                 return value;
             },
-            set: (target, property, value, receiver) => {
+            set: (target, property: string, value, receiver) => {
                 const oldValue = target[property];
                 const success = Reflect.set(target, property, value, receiver);
                 if (success) {
@@ -37,10 +34,10 @@ class Observable<T extends object> {
                 return success;
             },
         };
+        
         const proxy = new Proxy(obj, handler);
-        //console.log('new proxy created', obj); // If we use cache, this line is never reached after initialization
         this.#cache.set(obj, proxy);
-        return proxy; // Return a new proxy object
+        return proxy;
     }
 
     #fireCallbacks(key: string | symbol, oldPropValue: any, newPropValue: any) {
@@ -51,13 +48,13 @@ class Observable<T extends object> {
         }
     }
 
-    #proxy?: T;
-    get proxy(): T | undefined {
+    #proxy: typeof Proxy<T>;
+    get proxy(): typeof Proxy<T> {
         return this.#proxy;
     }
 
-    #target?: T;
-    get target(): T | undefined {
+    #target: T;
+    get target(): T {
         return this.#target;
     }
 

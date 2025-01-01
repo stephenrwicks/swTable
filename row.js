@@ -6,7 +6,8 @@ import { rowToTable, actionsToRow } from './weakMaps.js';
 export { Row };
 class Row {
     // Needs to be typed with a generic
-    #observable = new Observable();
+    // Force initialization with an empty object that is typed as T
+    #observable = new Observable({});
     rowId = crypto.randomUUID();
     cells = {
         detail: null,
@@ -44,7 +45,7 @@ class Row {
             const td = this.cells[column.colId];
             if (!td)
                 throw new Error('SwTable row render');
-            td.headers = `_${column.colId}`;
+            //td.headers = `_${column.colId}`;
             if (column.render)
                 td.replaceChildren(column.render(this));
             // Somehow detect if the new re-rendered element in this cell is the same as the one that was focused
@@ -145,16 +146,17 @@ class Row {
         return this.#tr;
     }
     // The table should be displaying the target, not the proxied data.
-    get $data() {
-        if (!this.#observable)
-            return;
-        return this.#observable.proxy;
-    }
-    set $data(data) {
+    setData(data) {
         this.#observable.target = data;
         this.#observable.callbacks = [];
         this.#observable.callbacks.push(this.render.bind(this));
         this.render();
+    }
+    get $data() {
+        return this.#observable.proxy;
+    }
+    // Probably should be method
+    set $data(data) {
     }
     get data() {
         return this.#observable.target;
@@ -188,7 +190,7 @@ class Row {
             return false;
         if (!this.#table.filters?.length)
             return true;
-        return this.#table.filters.every(fn => fn(this));
+        return this.#table.filters.every((fn) => fn(this));
     }
     detailIsVisible = false;
     showDetail() {

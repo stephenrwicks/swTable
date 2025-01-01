@@ -5,14 +5,14 @@
 // Fix colspan issues
 // CSS Themes and additions, icon hovers
 // Horizontal scroll + resizable
-// Generic typed data - big lift possibly
+// Generic typed data - big lift possibly - do this
 // Functional actions button disabled
 // Row actions setter
 // Move / drag row
 // Lazy render
 // Editable, crud modal, etc.
 // Preserving focus
-// Improve column drag
+// Improve column draginsert
 // Automatic init
 // Init from html
 // Add row button, add row dialog
@@ -27,21 +27,23 @@ import { Row } from './row.js';
 import { rowToTable, columnToTable } from './weakMaps.js';
 import { ActionSettings } from './actions.js';
 import { icons } from './icons.js';
-export { SwTable };
+export { SwTable, DataObject };
 
-type SwTableSettings = {
-    columns: Array<ColumnSettings>;
+type DataObject = Record<string, unknown>;
+
+type SwTableSettings<T extends DataObject> = {
+    columns: Array<ColumnSettings<T>>;
     theme?: 'mint' | 'ice';
-    data?: Array<any>;
+    data?: Array<T>;
     showSearch?: boolean;
     pageLength?: number;
     pageLengthOptions?: Array<number>;
-    detailFn?(row: Row): HTMLElement | string | null;
-    checkboxFn?(row: Row): boolean;
-    actionsFn?(row: Row): ActionSettings | null;
+    detailFn?(row: Row<T>): HTMLElement | string | null;
+    checkboxFn?(row: Row<T>): boolean;
+    actionsFn?(row: Row<T>): ActionSettings<T> | null;
 }
 
-class SwTable {
+class SwTable<T extends DataObject> {
 
     #els = {
         wrapper: document.createElement('div'),
@@ -62,13 +64,13 @@ class SwTable {
         selectAllCheckbox: document.createElement('input'),
     };
     
-    columnsObject: Record<string, Column | BuiltInColumn | null> = {
+    columnsObject: Record<string, Column<T> | BuiltInColumn | null> = {
         detail: null,
         checkbox: null,
         actions: null
     };
 
-    constructor(settings: SwTableSettings) {
+    constructor(settings: SwTableSettings<T>) {
         if (!settings?.columns) throw new Error('SwTable - no columns defined');
         settings.columns.forEach((colSetting, index) => {
             const column = new Column(colSetting);
@@ -126,8 +128,8 @@ class SwTable {
         this.#els.prevPageButton.type = 'button';
         this.#els.nextPageButton.title = 'Next Page';
         this.#els.prevPageButton.title = 'Previous Page';
-        this.#els.prevPageButton.classList.add('sw-table-button', 'sw-table-prev-page-button', 'sw-table-button-circle');
-        this.#els.nextPageButton.classList.add('sw-table-button', 'sw-table-next-page-button', 'sw-table-button-circle');
+        this.#els.prevPageButton.className = 'sw-table-button sw-table-prev-page-button sw-table-button-circle';
+        this.#els.nextPageButton.className = 'sw-table-button sw-table-next-page-button sw-table-button-circle';
         this.#els.nextPageButton.addEventListener('click', () => this.goToPage(this.currentPage + 1));
         this.#els.prevPageButton.addEventListener('click', () => this.goToPage(this.currentPage - 1));
         this.#els.nextPageButton.append(icons.chevron());
@@ -138,6 +140,10 @@ class SwTable {
     }
 
     setData(data: Array<any>) {
+        if (!Array.isArray(data)) {
+            console.error('setData');
+            return;
+        }
         while (this.rows.length) {
             this.rows[0].destroy();
         }
@@ -166,15 +172,15 @@ class SwTable {
         return this.#els.columnTr.children.length;
     }
 
-    get columns(): Array<Column> {
+    get columns(): Array<Column<T>> {
         // The compiler was complaining a lot about this method until I broke it up into 3 lines
         const columnVals = Object.values(this.columnsObject);
-        const customCols = columnVals.filter(column => column instanceof Column) as Array<Column>;
-        const sortedCustomCols = customCols.sort((a: Column, b: Column) => a.sortOrder - b.sortOrder) as Array<Column>;
+        const customCols = columnVals.filter(column => column instanceof Column) as Array<Column<T>>;
+        const sortedCustomCols = customCols.sort((a: Column<T>, b: Column<T>) => a.sortOrder - b.sortOrder);
         return sortedCustomCols;
     }
 
-    insertColumn(settings: ColumnSettings, index: number) {
+    insertColumn(settings: ColumnSettings<T>, index: number) {
         if (!settings || typeof index !== 'number') throw new Error('SwTable insertColumn');
         const column = new Column(settings);
         column.sortOrder = index;
@@ -184,7 +190,7 @@ class SwTable {
         for (const row of this.rows) row.render();
     }
 
-    #rows: Array<Row> = [];
+    #rows: Array<Row<T>> = [];
     get rows() {
         return this.#rows;
     }
@@ -197,10 +203,10 @@ class SwTable {
         // Fewer loops
     }
 
-    insertRow(data: any, index?: number): Row {
-        const row = new Row();
+    insertRow(data: T, index?: number): Row<T> {
+        const row = new Row<T>();
         rowToTable.set(row, this);
-        row.$data = data;
+        row.setData(data);
         if (typeof index === 'number' && this.#rows.length) {
             this.#rows[index].tr.before(row.tr);
             this.#rows.splice(index, 0, row);
@@ -213,11 +219,11 @@ class SwTable {
     }
 
     // This is where the detailRow is defined
-    #detailFn: SwTableSettings['detailFn'] | null = null;
+    #detailFn: SwTableSettings<T>['detailFn'] | null = null;
     get detailFn() {
         return this.#detailFn;
     }
-    set detailFn(fn: SwTableSettings['detailFn'] | null) {
+    set detailFn(fn: SwTableSettings<T>['detailFn'] | null) {
         this.#detailFn = fn;
         if (typeof this.#detailFn === 'function') {
             this.columnsObject.detail ??= new BuiltInColumn('detail');
@@ -234,11 +240,11 @@ class SwTable {
 
     }
 
-    #checkboxFn: SwTableSettings['checkboxFn'] | null = null;
+    #checkboxFn: SwTableSettings<T>['checkboxFn'] | null = null;
     get checkboxFn() {
         return this.#checkboxFn;
     }
-    set checkboxFn(fn: SwTableSettings['checkboxFn'] | null) {
+    set checkboxFn(fn: SwTableSettings<T>['checkboxFn'] | null) {
         this.#checkboxFn = fn;
         if (typeof this.#checkboxFn === 'function') {
             this.columnsObject.checkbox ??= new BuiltInColumn('checkbox');
@@ -253,11 +259,11 @@ class SwTable {
         for (const row of this.rows) row.render();
     }
 
-    #actionsFn: SwTableSettings['actionsFn'] | null = null;
+    #actionsFn: SwTableSettings<T>['actionsFn'] | null = null;
     get actionsFn() {
         return this.#actionsFn;
     }
-    set actionsFn(fn: SwTableSettings['actionsFn'] | null) {
+    set actionsFn(fn: SwTableSettings<T>['actionsFn'] | null) {
         this.#actionsFn = fn;
         if (typeof this.#actionsFn === 'function') {
             this.columnsObject.actions ??= new BuiltInColumn('actions');
@@ -270,11 +276,11 @@ class SwTable {
         for (const row of this.rows) row.render();
     }
 
-    #filters: Array<(row: Row) => boolean> | null = null;
+    #filters: Array<(row: Row<T>) => boolean> | null = null;
     get filters() {
         return this.#filters;
     }
-    set filters(filters: Array<(row: Row) => boolean> | null) {
+    set filters(filters: Array<(row: Row<T>) => boolean> | null) {
         this.#filters = filters;
         this.goToPage(1);
     }

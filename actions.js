@@ -15,8 +15,8 @@ class Actions {
             btn.type = 'button';
             btn.classList.add('sw-table-button');
             if (typeof s.disabled === 'function')
-                btn.disabled = s.disabled(row);
-            btn.addEventListener('click', async () => await s.fn(row));
+                btn.disabled = !!s.disabled(row);
+            btn.addEventListener('click', () => s.fn(row));
             btn.textContent = s.text ?? '';
             this.div.append(btn);
         }

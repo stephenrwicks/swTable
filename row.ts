@@ -3,12 +3,14 @@ import { Actions } from './actions.js';
 import { icons } from './icons.js';
 import { Observable } from './observable.js';
 import { rowToTable, actionsToRow } from './weakMaps.js';
+import { SwTable, DataObject } from './table.js';
 export { Row };
 
-class Row {
+class Row<T extends DataObject> {
 
     // Needs to be typed with a generic
-    #observable = new Observable<any>();
+    // Force initialization with an empty object that is typed as T
+    #observable = new Observable<T>({} as T);
 
     rowId = crypto.randomUUID();
     cells: { [key: string]: HTMLTableCellElement | null } = {
@@ -22,7 +24,7 @@ class Row {
     }
 
 
-    get #table() {
+    get #table(): SwTable<T> {
         return rowToTable.get(this);
     }
 
@@ -49,7 +51,7 @@ class Row {
             if (!(column.colId in this.cells)) this.cells[column.colId] = document.createElement('td');
             const td = this.cells[column.colId];
             if (!td) throw new Error('SwTable row render');
-            td.headers = `_${column.colId}`;
+            //td.headers = `_${column.colId}`;
             if (column.render) td.replaceChildren(column.render(this));
             // Somehow detect if the new re-rendered element in this cell is the same as the one that was focused
             // Losing focus is a huge challenge since there's no diffing 
@@ -113,7 +115,7 @@ class Row {
             this.checkbox = null;
         }
     }
-    #actions: Actions | null = null;
+    #actions: Actions<T> | null = null;
     actionsButton: HTMLButtonElement | null = null;
     renderActions() {
         if (!this.#table) return;
@@ -149,19 +151,23 @@ class Row {
 
     // The table should be displaying the target, not the proxied data.
 
-    get $data(): any {
-        if (!this.#observable) return;
-        return this.#observable.proxy;
-    }
-
-    set $data(data) {
+    setData(data: T) {
         this.#observable.target = data;
         this.#observable.callbacks = [];
         this.#observable.callbacks.push(this.render.bind(this));
         this.render();
     }
 
-    get data() {
+    get $data(): typeof Proxy<T> {
+        return this.#observable.proxy;
+    }
+
+    // Probably should be method
+    set $data(data: T) {
+
+    }
+
+    get data(): T {
         return this.#observable.target;
     }
 
@@ -188,7 +194,7 @@ class Row {
         if (!this.#table) return false;
         if (!this.isSearchMatch) return false;
         if (!this.#table.filters?.length) return true;
-        return this.#table.filters.every(fn => fn(this));
+        return this.#table.filters.every((fn: (row: Row<T>) => boolean) => fn(this));
     }
 
     detailIsVisible = false;

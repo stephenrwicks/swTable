@@ -1,23 +1,24 @@
 import { icons } from './icons.js';
 import { Row } from './row.js';
+import { SwTable } from './table.js';
 import { columnToTable } from './weakMaps.js';
 export { Column, ColumnSettings, BuiltInColumn };
-type ColumnSettings = {
-    render: (row: Row) => Element | string;
+type ColumnSettings<T extends Record<string, unknown>> = {
+    render: (row: Row<T>) => Element | string;
     name?: string;
-    sortBy?: ((row: Row) => string | number) | 'auto' | null; // Could also be by 'key' string but 'auto' could be a key
+    sortBy?: ((row: Row<T>) => string | number) | 'auto' | null; // Could also be by 'key' string but 'auto' could be a key
     isReactive?: boolean; // Not working yet
 
 }
 
 
-class Column {
+class Column<T extends Record<string, unknown>> {
 
     th = document.createElement('th');
     colId = crypto.randomUUID();
     sortOrder = -1;
 
-    constructor(settings: ColumnSettings) {
+    constructor(settings: ColumnSettings<T>) {
         const thButton = document.createElement('button');
         const span = document.createElement('span');
         const chevron = icons.chevron();
@@ -25,7 +26,7 @@ class Column {
         thButton.classList.add('sw-table-button');
         thButton.append(span, chevron);
         this.th.append(thButton);
-        this.th.id = `_${this.colId}`;
+        //this.th.id = `_${this.colId}`;
         this.th.scope = 'col';
         this.th.dataset.isAscending = 'false';
         this.th.dataset.isCurrentSort = 'false';
@@ -54,7 +55,7 @@ class Column {
             e.preventDefault();
             const colId = this.#table!.element.dataset.dragColId as string;
             if (colId === this.colId) return;
-            const draggingColumn = this.#table?.columnsObject[colId] as Column;
+            const draggingColumn = this.#table?.columnsObject[colId] as Column<T>;
             if (!draggingColumn) return;
             draggingColumn.moveTo(this.sortOrder);
         });
@@ -77,15 +78,15 @@ class Column {
     //     this.#isReactive = !!bool;
     // }
 
-    get #table() {
+    get #table(): SwTable<T> {
         return columnToTable.get(this);
     }
 
-    #render: ColumnSettings['render'] | null;
+    #render: ColumnSettings<T>['render'] | null;
     get render() {
         return this.#render;
     }
-    set render(fn: ColumnSettings['render'] | null) {
+    set render(fn: ColumnSettings<T>['render'] | null) {
         this.#render = typeof fn === 'function' ? fn : null;
         const table = this.#table;
         if (!table) return;
@@ -107,12 +108,12 @@ class Column {
 
     get cells() {
         if (!this.#table) return null;
-        return this.#table.rows.map(row => row.cells[this.colId]) as Array<HTMLTableCellElement>;
+        return this.#table.rows.map((row: Row<T>) => row.cells[this.colId]) as Array<HTMLTableCellElement>;
     }
 
     get cellsCurrentPage() {
         if (!this.#table) return [];
-        return this.#table.rowsCurrentPage.map(row => row.cells[this.colId]) as Array<HTMLTableCellElement>;
+        return this.#table.rowsCurrentPage.map((row: Row<T>) => row.cells[this.colId]) as Array<HTMLTableCellElement>;
     }
 
 
@@ -166,11 +167,11 @@ class Column {
         this.th = null as any;
     }
 
-    #sortBy: ColumnSettings['sortBy'] | null = null;
+    #sortBy: ColumnSettings<T>['sortBy'] | null = null;
     get sortBy() {
         return this.#sortBy;
     }
-    set sortBy(fn: ColumnSettings['sortBy'] | null) {
+    set sortBy(fn: ColumnSettings<T>['sortBy'] | null) {
         const isSortable = typeof fn === 'function' || fn === 'auto';
         if (isSortable) {
             this.#sortBy = fn;
@@ -178,10 +179,12 @@ class Column {
         else {
             this.#sortBy = null;
         }
-        // Re-sort if we are already sorted by this column
         this.th.querySelector('button')!.onclick = isSortable ? () => this.sort() : null;
         //this.th.querySelector('button')!.disabled = !isSortable;
         this.th.dataset.isSortable = String(isSortable);
+
+        // Re-sort if we are already sorted by this column
+        if (this.#isCurrentSort) this.sort(this.#isAscending);
     }
 
     #isAscending = false;
@@ -199,14 +202,14 @@ class Column {
             if (this.#sortBy === 'auto') {
                 // Automatically sort by the render function
                 if (!this.#render) throw new Error('swTable - auto sorting');
-                let aVal = this.#render!(a);
-                let bVal = this.#render!(b);
+                let aVal = this.#render(a);
+                let bVal = this.#render(b);
                 // Convert element or number to string
                 aVal = aVal instanceof HTMLElement ? aVal.innerText : String(aVal);
                 bVal = bVal instanceof HTMLElement ? bVal.innerText : String(bVal);
                 return !!ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
             }
-            // Sort by custom parameter
+            // Sort by custom function
             const aVal = String(this.#sortBy!(a));
             const bVal = String(this.#sortBy!(b));
             return !!ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
