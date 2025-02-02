@@ -1,7 +1,7 @@
 export { Observable };
 
 type DataObject = Record<string, unknown>;
-class Observable<T extends DataObject> {
+class Observable<T extends DataObject = DataObject> {
 
     constructor(target: T) {
         this.#target = target;

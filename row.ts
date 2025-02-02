@@ -1,12 +1,11 @@
 import { Detail } from './detail.js';
 import { Actions } from './actions.js';
-import { icons } from './icons.js';
 import { Observable } from './observable.js';
 import { rowToTable, actionsToRow } from './weakMaps.js';
 import { SwTable, DataObject } from './table.js';
 export { Row };
 
-class Row<T extends DataObject> {
+class Row<T extends DataObject = DataObject> {
 
     // Needs to be typed with a generic
     // Force initialization with an empty object that is typed as T
@@ -39,7 +38,6 @@ class Row<T extends DataObject> {
 
     render() {
         if (!this.#table) return;
-        // The focused element is being completely re-rendered 
         this.#tr.replaceChildren();
         if (this.#table.columnsObject.detail) {
             this.cells.detail ??= document.createElement('td');
@@ -47,14 +45,11 @@ class Row<T extends DataObject> {
             this.#tr.append(this.cells.detail);
         }
         for (const column of this.#table.columns) {
-            // const focusEl = document.querySelector(':focus');
-            if (!(column.colId in this.cells)) this.cells[column.colId] = document.createElement('td');
+            if (!column.isShowing) continue; // Skip hidden columns
+            this.cells[column.colId] ??= document.createElement('td');
             const td = this.cells[column.colId];
             if (!td) throw new Error('SwTable row render');
-            //td.headers = `_${column.colId}`;
             if (column.render) td.replaceChildren(column.render(this));
-            // Somehow detect if the new re-rendered element in this cell is the same as the one that was focused
-            // Losing focus is a huge challenge since there's no diffing 
             this.#tr.append(td);
         }
         if (this.#table.columnsObject.actions) {
@@ -87,10 +82,12 @@ class Row<T extends DataObject> {
             this.detail.render(detailContents, this.#table.colSpan);
             if (this.detailButton === null) {
                 this.detailButton = document.createElement('button');
+                const icon = document.createElement('div');
+                icon.className = 'sw-table-icon sw-table-chevron';
                 this.detailButton.type = 'button';
                 this.detailButton.title = 'Toggle Details';
                 this.detailButton.classList.add('sw-table-button', 'sw-table-detail-button', 'sw-table-button-circle');
-                this.detailButton.append(icons.chevron());
+                this.detailButton.append(icon);
                 this.detailButton.addEventListener('click', () => this.toggleDetail());
                 this.cells.detail?.append(this.detailButton);
             }
@@ -131,14 +128,16 @@ class Row<T extends DataObject> {
             if (!Array.isArray(actionsArray)) throw new Error('swTable - Actions have to be an array.')
             this.#actions ??= new Actions();
             actionsToRow.set(this.#actions, this);
-            this.#actions.render(actionsArray);
+            this.#actions.render(actionsArray); // Possibly we render actions on click instead, saving time
             if (this.actionsButton === null) {
                 this.actionsButton = document.createElement('button');
+                const icon = document.createElement('div');
+                icon.className = 'sw-table-icon sw-table-ellipsis'
                 this.actionsButton.type = 'button';
                 this.actionsButton.title = 'Toggle Actions';
-                this.actionsButton.classList.add('sw-table-button', 'sw-table-actions-button', 'sw-table-button-circle');
-                this.actionsButton.append(icons.ellipsis());
+                this.actionsButton.className = 'sw-table-button sw-table-actions-button sw-table-button-circle';
                 this.actionsButton.addEventListener('click', () => this.toggleActions());
+                this.actionsButton.append(icon);
                 this.cells.actions?.append(this.actionsButton);
             }
         }
@@ -150,6 +149,7 @@ class Row<T extends DataObject> {
     }
 
     // The table should be displaying the target, not the proxied data.
+    // Displaying proxied data will work, but requires more overhead
 
     setData(data: T) {
         this.#observable.target = data;
@@ -158,20 +158,16 @@ class Row<T extends DataObject> {
         this.render();
     }
 
-    get $data(): typeof Proxy<T> {
-        return this.#observable.proxy;
-    }
-
-    // Probably should be method
-    set $data(data: T) {
-
+    get $data(): T {
+        // We return the Proxy as type T so that regular type inference can be useful
+        return this.#observable.proxy as unknown as T;
     }
 
     get data(): T {
         return this.#observable.target;
     }
 
-    get dataSnapshot() {
+    get dataSnapshot(): T {
         return structuredClone(this.#observable.target);
     }
 
@@ -193,6 +189,7 @@ class Row<T extends DataObject> {
     get isFilterTrue() {
         if (!this.#table) return false;
         if (!this.isSearchMatch) return false;
+        // Check filter boxes
         if (!this.#table.filters?.length) return true;
         return this.#table.filters.every((fn: (row: Row<T>) => boolean) => fn(this));
     }

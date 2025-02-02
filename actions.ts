@@ -3,13 +3,13 @@ import { actionsToRow } from './weakMaps.js';
 import { DataObject } from './table.js';
 export { Actions, ActionSettings };
 
-type ActionSettings<T extends DataObject> = Array<{
+type ActionSettings<T extends DataObject = DataObject> = Array<{
     text: string;
     fn(row: Row<T>): any;
     disabled?(row: Row<T>): boolean;
 }>
 
-class Actions<T extends DataObject>  {
+class Actions<T extends DataObject = DataObject>  {
 
     div = document.createElement('div');
 

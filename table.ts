@@ -1,49 +1,61 @@
+// Introduce the concept of the Cell class. It seems like maintaining state of every cell is correct
+// 
 // Figure out data vs $data api
 // Paging buttons, paging dropdown - placement?
-// Filters, FilterBox, FilterModal? -- Use sliders icon
+// Filters, FilterBox, FilterModal -- Use sliders icon - slide-out div overlapping
 // show/hide column options
 // Fix colspan issues
 // CSS Themes and additions, icon hovers
 // Horizontal scroll + resizable
-// Generic typed data - big lift possibly - do this
+// Resizable columns - Programmatically update <col> on drag
+// non-reactive columns to allow inputs and stuff to be placed
 // Functional actions button disabled
-// Row actions setter
-// Move / drag row
-// Lazy render
-// Editable, crud modal, etc.
-// Preserving focus
+
+
+// aria-live
+
+// make dragover have one listener that is applied to the entire table / thead + tbody. locates column to swap
+
+// onRender() callback on row, onDataChange()
+// onOpenDetails()
+
+// Introduce the <colgroup> and <col> elements
+// Introduce caption element
+
+// Add row button, add row dialog (Would need a create modal built in)
+// observable oldvalue newvalue stuff - This is probably not necessary in this context
 // Improve column draginsert
 // Automatic init
 // Init from html
-// Add row button, add row dialog
-// aria-live
-// observable memoization, also oldvalue newvalue stuff
-// make dragover have one listener that is applied to the entire table / thead + tbody. locates column to swap
-// Custom events. Like pass up rowClick, etc to element
-// onRender() callback on row, onDataChange()
+// Preserving focus
+// Move / drag row
+// Lazy render
+// Editable, crud modal, etc.
+// Row actions setter
 
 import { Column, ColumnSettings, BuiltInColumn } from './column.js';
 import { Row } from './row.js';
 import { rowToTable, columnToTable } from './weakMaps.js';
 import { ActionSettings } from './actions.js';
-import { icons } from './icons.js';
 export { SwTable, DataObject };
 
 type DataObject = Record<string, unknown>;
 
-type SwTableSettings<T extends DataObject> = {
+type SwTableSettings<T extends DataObject = DataObject> = {
     columns: Array<ColumnSettings<T>>;
     theme?: 'mint' | 'ice';
     data?: Array<T>;
     showSearch?: boolean;
     pageLength?: number;
     pageLengthOptions?: Array<number>;
+    draggableColumns?: boolean;
     detailFn?(row: Row<T>): HTMLElement | string | null;
     checkboxFn?(row: Row<T>): boolean;
     actionsFn?(row: Row<T>): ActionSettings<T> | null;
+    resizable?: 'both' | 'horizontal' | 'vertical';
 }
 
-class SwTable<T extends DataObject> {
+class SwTable<T extends DataObject = DataObject> {
 
     #els = {
         wrapper: document.createElement('div'),
@@ -52,6 +64,7 @@ class SwTable<T extends DataObject> {
         headerTd: document.createElement('td'),
         headerDiv: document.createElement('div'),
         columnTr: document.createElement('tr'),
+        colgroup: document.createElement('colgroup'),
         tbody: document.createElement('tbody'),
         tfoot: document.createElement('tfoot'),
         tfootTr: document.createElement('tr'),
@@ -63,7 +76,7 @@ class SwTable<T extends DataObject> {
         pageLengthSelect: document.createElement('select'),
         selectAllCheckbox: document.createElement('input'),
     };
-    
+
     columnsObject: Record<string, Column<T> | BuiltInColumn | null> = {
         detail: null,
         checkbox: null,
@@ -84,12 +97,16 @@ class SwTable<T extends DataObject> {
         if (typeof settings.checkboxFn === 'function') this.checkboxFn = settings.checkboxFn;
         this.renderColumnTr();
 
+        this.draggableColumns = !!settings.draggableColumns;
+
         this.pageLengthOptions = settings.pageLengthOptions ?? [0];
 
         this.pageLength = Array.isArray(this.pageLengthOptions) ? this.pageLengthOptions[0] : 0;
 
         settings.showSearch ??= true;
         this.showSearch = !!settings.showSearch;
+
+        this.#els.table.append(this.#els.colgroup);
 
         const headerTr = document.createElement('tr');
         this.#els.headerTd.append(this.#els.headerDiv);
@@ -132,25 +149,41 @@ class SwTable<T extends DataObject> {
         this.#els.nextPageButton.className = 'sw-table-button sw-table-next-page-button sw-table-button-circle';
         this.#els.nextPageButton.addEventListener('click', () => this.goToPage(this.currentPage + 1));
         this.#els.prevPageButton.addEventListener('click', () => this.goToPage(this.currentPage - 1));
-        this.#els.nextPageButton.append(icons.chevron());
-        this.#els.prevPageButton.append(icons.chevron());
+        const nextIcon = document.createElement('div');
+        const prevIcon = document.createElement('div');
+        nextIcon.className = 'sw-table-icon sw-table-chevron';
+        prevIcon.className = 'sw-table-icon sw-table-chevron';
+        this.#els.nextPageButton.append(nextIcon);
+        this.#els.prevPageButton.append(prevIcon);
+
+        if (settings.resizable) {
+            this.#els.wrapper.style.overflow = 'auto';
+            this.#els.wrapper.style.resize = settings.resizable;
+        }
+
 
         if (Array.isArray(settings.data) && settings.data.length) this.setData(settings.data);
 
     }
 
-    setData(data: Array<any>) {
+
+
+    setData(data: Array<T>) {
         if (!Array.isArray(data)) {
             console.error('setData');
             return;
         }
-        while (this.rows.length) {
-            this.rows[0].destroy();
-        }
+        this.clearData();
         for (const datum of data) {
             this.insertRow(datum);
         }
         this.goToPage(1);
+    }
+
+    clearData() {
+        while (this.rows.length) {
+            this.rows[0].destroy();
+        }
     }
 
     get $data() {
@@ -164,6 +197,15 @@ class SwTable<T extends DataObject> {
         return this.rows.map(row => row.dataSnapshot);
     }
 
+    #stateRecords: Record<string, Array<T>> = {};
+    saveState(str: string) {
+        this.#stateRecords[str] = this.dataSnapshot;
+    }
+    loadState(str: string) {
+        if (!(str in this.#stateRecords)) throw new Error(`SwTable - State ${str} doesn't exist`);
+        this.setData(structuredClone(this.#stateRecords[str]));
+    }
+
     get element() {
         return this.#els.wrapper;
     }
@@ -173,10 +215,9 @@ class SwTable<T extends DataObject> {
     }
 
     get columns(): Array<Column<T>> {
-        // The compiler was complaining a lot about this method until I broke it up into 3 lines
         const columnVals = Object.values(this.columnsObject);
         const customCols = columnVals.filter(column => column instanceof Column) as Array<Column<T>>;
-        const sortedCustomCols = customCols.sort((a: Column<T>, b: Column<T>) => a.sortOrder - b.sortOrder);
+        const sortedCustomCols = customCols.sort((a, b) => a.sortOrder - b.sortOrder);
         return sortedCustomCols;
     }
 
@@ -188,6 +229,14 @@ class SwTable<T extends DataObject> {
         this.columnsObject[column.colId] = column;
         this.renderColumnTr();
         for (const row of this.rows) row.render();
+    }
+
+    #draggableColumns = true;
+    get draggableColumns() {
+        return this.#draggableColumns;
+    }
+    set draggableColumns(bool: boolean) {
+
     }
 
     #rows: Array<Row<T>> = [];
@@ -316,7 +365,8 @@ class SwTable<T extends DataObject> {
         if (!this.#showSearch && bool) {
             const searchWrapper = document.createElement('div');
             searchWrapper.classList.add('sw-table-search-wrapper');
-            const searchIcon = icons.magnifyingGlass();
+            const searchIcon = document.createElement('div');
+            searchIcon.className = 'sw-table-icon sw-table-magnifying-glass';
             this.searchInput ??= document.createElement('input');
             this.searchInput.type = 'text';
             this.searchInput.title = 'Search';
@@ -427,13 +477,52 @@ class SwTable<T extends DataObject> {
     }
 
     renderColumnTr() {
+        this.#els.colgroup.replaceChildren();
         this.#els.columnTr.replaceChildren();
-        if (this.columnsObject.detail) this.#els.columnTr.append(this.columnsObject.detail.th);
-        for (const column of this.columns) {
-            if (column === null) continue;
-            this.#els.columnTr.append(column.th);
+        if (this.columnsObject.detail) {
+            this.#els.columnTr.append(this.columnsObject.detail.th);
+            this.#els.colgroup.append(this.columnsObject.detail.col);
         }
-        if (this.columnsObject.actions) this.#els.columnTr.append(this.columnsObject.actions.th);
-        if (this.columnsObject.checkbox) this.#els.columnTr.append(this.columnsObject.checkbox.th);
+        for (const column of this.columns) {
+            if (column === null || !column.isShowing) continue;
+            this.#els.columnTr.append(column.th);
+            this.#els.colgroup.append(column.col);
+        }
+        if (this.columnsObject.actions) {
+            this.#els.columnTr.append(this.columnsObject.actions.th);
+            this.#els.colgroup.append(this.columnsObject.actions.col);
+        }
+        if (this.columnsObject.checkbox) {
+            this.#els.columnTr.append(this.columnsObject.checkbox.th);
+            this.#els.colgroup.append(this.columnsObject.checkbox.col);
+        }
     }
+
+    columnModal() {
+
+        const modal = document.createElement('dialog');
+        this.#els.wrapper.append(modal);
+        for (const col of this.columns) {
+            const label = document.createElement('label');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            label.append(checkbox, col.name);
+            checkbox.value = col.colId;
+            modal.append(label);
+        }
+        modal.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            // calling show() hide() on each individually is a lot of renders
+            modal.querySelectorAll('input').forEach(checkbox => {
+                const col = this.columnsObject[checkbox.value];
+                if (col instanceof Column && checkbox.checked) col.show();
+                if (col instanceof Column && !checkbox.checked) col.hide();
+                modal.remove();
+            });
+        });
+        modal.showModal();
+
+
+    }
+
 }

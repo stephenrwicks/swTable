@@ -1,8 +1,7 @@
 .sw-table-wrapper {
     width: 900px;
-    /* resize: horizontal;
-    overflow: auto; */
 }
+
 
 .sw-table {
     width: 100%;
@@ -31,18 +30,12 @@
     th {
         padding: 0px;
         vertical-align: middle;
-
-        &:hover {
-            /* color: red;
-            fill: red; */
-        }
     }
 
     td {
         padding: 4px 10px;
         vertical-align: middle;
     }
-
 
     .sw-table-dragging {
         background-color: var(--dragColor);
@@ -98,17 +91,21 @@
 
     }
 
+    /* tbody:empty::before {
+        content: "No data to show.";
+        display: block;
+        height: 100px;
+    } */
+
+
+
     .sw-table-tfoot-div {
         display: flex;
         justify-content: end;
         align-items: center;
     }
 
-    .sw-table-icon {
-        fill: var(--fontColor);
-        scale: 1.4;
-        display: block;
-    }
+
 
     .sw-table-button {
         all: unset;
@@ -152,7 +149,7 @@
 
     th .sw-table-icon {
         visibility: hidden;
-        scale: 1.2;
+        scale: 1;
     }
 
     th[data-is-current-sort="true"] .sw-table-icon {
@@ -189,7 +186,6 @@
     .sw-table-actions-div {
         position: absolute;
         top: calc(100% - 8px);
-        left: -100%;
         background-color: white;
         border: 1px solid var(--outerBorderColor);
         z-index: 99;
@@ -209,9 +205,10 @@
     .sw-table-search-wrapper {
         display: grid;
         align-items: center;
+        background-color: white;
     }
 
-    .sw-table-search-wrapper>.sw-table-icon {
+    .sw-table-search-wrapper>.sw-table-magnifying-glass {
         grid-area: 1/1/1/1;
         scale: .7;
     }
@@ -223,7 +220,6 @@
         padding: 2px 2px 2px 25px;
         border: 0px;
         outline: 1px solid var(--buttonFocusColor);
-        background-color: white;
 
         &:focus {
             background-color: var(--buttonHoverBackground);
@@ -264,4 +260,31 @@
     &[data-sw-table-theme="ice"] {
         
     }
+
+    /* Icons */
+
+    .sw-table-icon {
+        fill: var(--fontColor);
+        scale: 1.4;
+        display: block;
+        
+        background-size: contain;
+        background-repeat: no-repeat;
+        width: 24px;
+        height: 24px;
+    }
+
+    .sw-table-icon.sw-table-magnifying-glass {
+        background-image: url('data:image/svg+xml,%3Csvg viewBox%3D%220 0 24 24%22 width%3D%2224%22 height%3D%2224%22 xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Ccircle cx%3D%2210%22 cy%3D%2210%22 r%3D%227%22 stroke%3D%22black%22 stroke-width%3D%222%22 fill%3D%22none%22/%3E%3Cline x1%3D%2214%22 y1%3D%2214%22 x2%3D%2220%22 y2%3D%2220%22 stroke%3D%22black%22 stroke-width%3D%222%22/%3E%3C/svg%3E');
+    }
+
+    .sw-table-icon.sw-table-ellipsis {
+        background-image: url('data:image/svg+xml,%3Csvg xmlns%3D%22http%3A//www.w3.org/2000/svg%22 viewBox%3D%220 0 24 24%22 width%3D%2224%22 height%3D%2224%22%3E%3Ccircle cx%3D%2212%22 cy%3D%226%22 r%3D%222%22 fill%3D%22currentColor%22/%3E%3Ccircle cx%3D%2212%22 cy%3D%2212%22 r%3D%222%22 fill%3D%22currentColor%22/%3E%3Ccircle cx%3D%2212%22 cy%3D%2218%22 r%3D%222%22 fill%3D%22currentColor%22/%3E%3C/svg%3E');
+    }
+
+    .sw-table-icon.sw-table-chevron {
+        background-image: url('data:image/svg+xml,%3Csvg viewBox%3D%220 0 24 24%22 width%3D%2224%22 height%3D%2224%22 xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath d%3D%22M8.59 16.59L13.17 12L8.59 7.41L10 6L16 12L10 18L8.59 16.59Z%22 fill%3D%22currentColor%22/%3E%3C/svg%3E');
+    }
+
+
 }

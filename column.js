@@ -1,22 +1,24 @@
-import { icons } from './icons.js';
 import { columnToTable } from './weakMaps.js';
 export { Column, BuiltInColumn };
 class Column {
     th = document.createElement('th');
+    col = document.createElement('col');
     colId = crypto.randomUUID();
     sortOrder = -1;
     constructor(settings) {
         const thButton = document.createElement('button');
         const span = document.createElement('span');
-        const chevron = icons.chevron();
+        const icon = document.createElement('div');
+        icon.className = 'sw-table-icon sw-table-chevron';
         thButton.type = 'button';
         thButton.classList.add('sw-table-button');
-        thButton.append(span, chevron);
+        thButton.append(span, icon);
         this.th.append(thButton);
         //this.th.id = `_${this.colId}`;
         this.th.scope = 'col';
         this.th.dataset.isAscending = 'false';
         this.th.dataset.isCurrentSort = 'false';
+        this.col.dataset.id = this.colId;
         //this.isReactive = typeof settings.isReactive === 'boolean' ? settings.isReactive : true;
         this.#render = typeof settings.render === 'function' ? settings.render : null;
         if (typeof settings.sortBy === 'undefined')
@@ -30,6 +32,7 @@ class Column {
                 return;
             // Make the dragged column as wide as the widest column. Prevents flickering
             const largestWidth = table.columns
+                .filter(col => col.isShowing)
                 .map(col => parseFloat(getComputedStyle(col.th).width))
                 .reduce((max, width) => Math.max(max, width), 0);
             this.th.style.width = `${largestWidth}px`;
@@ -208,19 +211,25 @@ class Column {
         this.th.dataset.isCurrentSort = String(this.#isCurrentSort);
         this.#table.goToPage(1);
     }
-    #isShowing = true;
+    isShowing = true;
     show() {
-        if (this.#isShowing)
+        if (this.isShowing)
             return;
-        this.#isShowing = true;
+        this.isShowing = true;
+        this.#table.renderColumnTr();
+        for (const row of this.#table.rows)
+            row.render();
     }
     hide() {
-        if (!this.#isShowing)
+        if (!this.isShowing)
             return;
-        this.#isShowing = false;
+        this.isShowing = false;
+        this.#table.renderColumnTr();
+        for (const row of this.#table.rows)
+            row.render();
     }
     toggle() {
-        if (this.#isShowing)
+        if (this.isShowing)
             this.hide();
         else
             this.show();
@@ -229,9 +238,11 @@ class Column {
 class BuiltInColumn {
     th = document.createElement('th');
     colId;
+    col = document.createElement('col');
     constructor(type) {
         this.colId = type;
         this.th.classList.add('sw-table-th-built-in', `sw-table-th-built-in-${type}`);
+        this.col.dataset.id = this.colId;
     }
     get #table() {
         return columnToTable.get(this);

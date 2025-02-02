@@ -1,9 +1,8 @@
-import { icons } from './icons.js';
 import { Row } from './row.js';
-import { SwTable } from './table.js';
+import { DataObject, SwTable } from './table.js';
 import { columnToTable } from './weakMaps.js';
 export { Column, ColumnSettings, BuiltInColumn };
-type ColumnSettings<T extends Record<string, unknown>> = {
+type ColumnSettings<T extends DataObject> = {
     render: (row: Row<T>) => Element | string;
     name?: string;
     sortBy?: ((row: Row<T>) => string | number) | 'auto' | null; // Could also be by 'key' string but 'auto' could be a key
@@ -12,24 +11,28 @@ type ColumnSettings<T extends Record<string, unknown>> = {
 }
 
 
-class Column<T extends Record<string, unknown>> {
+class Column<T extends DataObject = DataObject> {
 
     th = document.createElement('th');
+    col = document.createElement('col');
     colId = crypto.randomUUID();
+
     sortOrder = -1;
 
     constructor(settings: ColumnSettings<T>) {
         const thButton = document.createElement('button');
         const span = document.createElement('span');
-        const chevron = icons.chevron();
+        const icon = document.createElement('div');
+        icon.className = 'sw-table-icon sw-table-chevron';
         thButton.type = 'button';
         thButton.classList.add('sw-table-button');
-        thButton.append(span, chevron);
+        thButton.append(span, icon);
         this.th.append(thButton);
         //this.th.id = `_${this.colId}`;
         this.th.scope = 'col';
         this.th.dataset.isAscending = 'false';
         this.th.dataset.isCurrentSort = 'false';
+        this.col.dataset.id = this.colId;
         //this.isReactive = typeof settings.isReactive === 'boolean' ? settings.isReactive : true;
         this.#render = typeof settings.render === 'function' ? settings.render : null;
         if (typeof settings.sortBy === 'undefined') settings.sortBy = 'auto';
@@ -42,6 +45,7 @@ class Column<T extends Record<string, unknown>> {
             if (!table) return;
             // Make the dragged column as wide as the widest column. Prevents flickering
             const largestWidth = table.columns
+                .filter(col => col.isShowing)
                 .map(col => parseFloat(getComputedStyle(col.th).width))
                 .reduce((max, width) => Math.max(max, width), 0);
             this.th.style.width = `${largestWidth}px`;
@@ -221,19 +225,23 @@ class Column<T extends Record<string, unknown>> {
         this.#table.goToPage(1);
     }
 
-    #isShowing = true;
+    isShowing = true;
     show() {
-        if (this.#isShowing) return;
-        this.#isShowing = true;
+        if (this.isShowing) return;
+        this.isShowing = true;
+        this.#table.renderColumnTr();
+        for (const row of this.#table.rows) row.render();
     }
     
     hide() {
-        if (!this.#isShowing) return;
-        this.#isShowing = false;
+        if (!this.isShowing) return;
+        this.isShowing = false;
+        this.#table.renderColumnTr();
+        for (const row of this.#table.rows) row.render();
     }
 
     toggle() {
-        if (this.#isShowing) this.hide();
+        if (this.isShowing) this.hide();
         else this.show();
     }
 }
@@ -241,9 +249,12 @@ class Column<T extends Record<string, unknown>> {
 class BuiltInColumn {
     th = document.createElement('th');
     colId: string;
+    col = document.createElement('col');
+
     constructor(type: 'detail' | 'actions' | 'checkbox') {
         this.colId = type;
         this.th.classList.add('sw-table-th-built-in', `sw-table-th-built-in-${type}`);
+        this.col.dataset.id = this.colId;
     }
     get #table() {
         return columnToTable.get(this);
