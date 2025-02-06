@@ -1,4 +1,4 @@
-// Introduce the concept of the Cell class. It seems like maintaining state of every cell is correct
+// Functional footer
 // 
 // Figure out data vs $data api
 // Paging buttons, paging dropdown - placement?
@@ -41,6 +41,8 @@ class SwTable {
         colgroup: document.createElement('colgroup'),
         tbody: document.createElement('tbody'),
         tfoot: document.createElement('tfoot'),
+        summaryTr: document.createElement('tr'),
+        summaryTd: document.createElement('td'),
         tfootTr: document.createElement('tr'),
         tfootTd: document.createElement('td'),
         tfootDiv: document.createElement('div'),
@@ -70,10 +72,12 @@ class SwTable {
             this.actionsFn = settings.actionsFn;
         if (typeof settings.checkboxFn === 'function')
             this.checkboxFn = settings.checkboxFn;
+        if (typeof settings.summaryFn === 'function')
+            this.summaryFn = settings.summaryFn;
         this.renderColumnTr();
         this.draggableColumns = !!settings.draggableColumns;
         this.pageLengthOptions = settings.pageLengthOptions ?? [0];
-        this.pageLength = Array.isArray(this.pageLengthOptions) ? this.pageLengthOptions[0] : 0;
+        this.#pageLength = Array.isArray(this.pageLengthOptions) ? this.pageLengthOptions[0] : 0;
         settings.showSearch ??= true;
         this.showSearch = !!settings.showSearch;
         this.#els.table.append(this.#els.colgroup);
@@ -81,6 +85,7 @@ class SwTable {
         this.#els.headerTd.append(this.#els.headerDiv);
         headerTr.append(this.#els.headerTd);
         this.#els.headerTd.colSpan = 999;
+        this.#els.summaryTd.colSpan = 999;
         this.#els.thead.append(headerTr, this.#els.columnTr);
         this.#els.tfootDiv.append(this.#els.pageNumberDiv, this.#els.prevPageButton, this.#els.nextPageButton);
         this.#els.tfootTd.append(this.#els.tfootDiv);
@@ -88,6 +93,7 @@ class SwTable {
         this.#els.tfoot.append(this.#els.tfootTr);
         this.#els.table.append(this.#els.thead, this.#els.tbody, this.#els.tfoot);
         this.#els.wrapper.append(this.#els.table);
+        this.#els.summaryTr.append(this.#els.summaryTd);
         this.#els.headerDiv.classList.add('sw-table-header');
         this.#els.headerTd.classList.add('sw-table-header-td');
         this.#els.table.classList.add('sw-table');
@@ -99,12 +105,8 @@ class SwTable {
         this.#els.selectAllCheckbox.title = 'Toggle All';
         this.#els.pageLengthSelect.addEventListener('change', () => this.pageLength = Number(this.#els.pageLengthSelect.value));
         this.#els.table.dataset.swTableTheme = typeof settings.theme === 'string' ? settings.theme : '';
-        if (typeof settings.pageLength === 'number') {
-            this.pageLength = settings.pageLength;
-        }
-        else {
-            this.goToPage(1);
-        }
+        if (typeof settings.pageLength === 'number')
+            this.#pageLength = settings.pageLength;
         this.#els.selectAllCheckbox.type = 'checkbox';
         this.#els.selectAllCheckbox.addEventListener('change', () => this.toggleCheckAllRows());
         this.#els.nextPageButton.type = 'button';
@@ -121,10 +123,6 @@ class SwTable {
         prevIcon.className = 'sw-table-icon sw-table-chevron';
         this.#els.nextPageButton.append(nextIcon);
         this.#els.prevPageButton.append(prevIcon);
-        if (settings.resizable) {
-            this.#els.wrapper.style.overflow = 'auto';
-            this.#els.wrapper.style.resize = settings.resizable;
-        }
         if (Array.isArray(settings.data) && settings.data.length)
             this.setData(settings.data);
     }
@@ -195,12 +193,6 @@ class SwTable {
     get rows() {
         return this.#rows;
     }
-    renderPage(targetPage) {
-        // To optimize, each row could have a "state" object
-        for (const row of this.rowsCurrentPage) {
-        }
-        // Fewer loops
-    }
     insertRow(data, index) {
         const row = new Row();
         rowToTable.set(row, this);
@@ -215,6 +207,9 @@ class SwTable {
         }
         return row;
     }
+    sortCustom(customSortFn) {
+        // Has to be some comparison fn
+    }
     // This is where the detailRow is defined
     #detailFn = null;
     get detailFn() {
@@ -222,12 +217,7 @@ class SwTable {
     }
     set detailFn(fn) {
         this.#detailFn = fn;
-        if (typeof this.#detailFn === 'function') {
-            this.columnsObject.detail ??= new BuiltInColumn('detail');
-        }
-        else {
-            this.columnsObject.detail?.destroy();
-        }
+        this.columnsObject.detail = typeof this.#detailFn === 'function' ? new BuiltInColumn('detail') : null;
         if (!this.rows.length)
             return;
         this.renderColumnTr();
@@ -242,13 +232,9 @@ class SwTable {
     }
     set checkboxFn(fn) {
         this.#checkboxFn = fn;
-        if (typeof this.#checkboxFn === 'function') {
-            this.columnsObject.checkbox ??= new BuiltInColumn('checkbox');
+        this.columnsObject.checkbox = typeof this.#checkboxFn === 'function' ? new BuiltInColumn('checkbox') : null;
+        if (this.columnsObject.checkbox)
             this.columnsObject.checkbox.th.append(this.#els.selectAllCheckbox);
-        }
-        else {
-            this.columnsObject.checkbox?.destroy();
-        }
         if (!this.rows.length)
             return;
         this.renderColumnTr();
@@ -261,17 +247,20 @@ class SwTable {
     }
     set actionsFn(fn) {
         this.#actionsFn = fn;
-        if (typeof this.#actionsFn === 'function') {
-            this.columnsObject.actions ??= new BuiltInColumn('actions');
-        }
-        else {
-            this.columnsObject.actions?.destroy();
-        }
+        this.columnsObject.actions = typeof this.#actionsFn === 'function' ? new BuiltInColumn('actions') : null;
         if (!this.rows.length)
             return;
         this.renderColumnTr();
         for (const row of this.rows)
             row.render();
+    }
+    #summaryFn = null;
+    get summaryFn() {
+        return this.#summaryFn;
+    }
+    set summaryFn(fn) {
+        this.#summaryFn = fn;
+        this._renderSummary();
     }
     #filters = null;
     get filters() {
@@ -391,6 +380,7 @@ class SwTable {
     }
     // This is the single DOM placement method
     goToPage(n) {
+        console.log('test');
         if (typeof n !== 'number')
             return;
         n = Math.floor(n);
@@ -407,6 +397,7 @@ class SwTable {
             if (row.detail && row.detailIsVisible)
                 this.#els.tbody.append(row.detail.tr);
         });
+        this._renderSummary();
         const first = this.rowsFilterTrue.indexOf(rowsToShow[0]) + 1;
         const last = this.rowsFilterTrue.indexOf(rowsToShow[rowsToShow.length - 1]) + 1;
         this.#els.tfootTd.colSpan = this.colSpan;
@@ -436,30 +427,40 @@ class SwTable {
             this.#els.colgroup.append(this.columnsObject.checkbox.col);
         }
     }
-    columnModal() {
-        const modal = document.createElement('dialog');
-        this.#els.wrapper.append(modal);
-        for (const col of this.columns) {
+    _renderSummary() {
+        if (typeof this.#summaryFn === 'function') {
+            const contents = this.#summaryFn(this);
+            this.#els.summaryTd.replaceChildren(contents ?? '');
+            this.#els.tfoot.prepend(this.#els.summaryTr);
+        }
+        else {
+            this.#els.summaryTr.remove();
+        }
+    }
+    settingsDialog() {
+        const dialog = document.createElement('dialog');
+        dialog.classList.add('sw-table-column-dialog');
+        this.#els.wrapper.append(dialog);
+        const labels = this.columns.map(col => {
             const label = document.createElement('label');
             const checkbox = document.createElement('input');
+            checkbox.checked = col.isShowing;
             checkbox.type = 'checkbox';
-            label.append(checkbox, col.name);
-            checkbox.value = col.colId;
-            modal.append(label);
-        }
-        modal.addEventListener('keydown', (e) => {
-            if (e.key !== 'Enter')
-                return;
-            // calling show() hide() on each individually is a lot of renders
-            modal.querySelectorAll('input').forEach(checkbox => {
-                const col = this.columnsObject[checkbox.value];
-                if (col instanceof Column && checkbox.checked)
+            checkbox.className = 'sw-table-checkbox';
+            checkbox.addEventListener('change', () => {
+                if (checkbox.checked)
                     col.show();
-                if (col instanceof Column && !checkbox.checked)
+                else
                     col.hide();
-                modal.remove();
             });
+            label.append(checkbox, col.name);
+            return label;
         });
-        modal.showModal();
+        dialog.append(...labels);
+        dialog.show();
+        dialog.style.left = '0px';
+        dialog.addEventListener('cancel', () => {
+            dialog.remove();
+        });
     }
 }

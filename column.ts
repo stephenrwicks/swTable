@@ -3,11 +3,11 @@ import { DataObject, SwTable } from './table.js';
 import { columnToTable } from './weakMaps.js';
 export { Column, ColumnSettings, BuiltInColumn };
 type ColumnSettings<T extends DataObject> = {
-    render: (row: Row<T>) => Element | string;
+    render: (row: Row<T>) => HTMLElement | string;
     name?: string;
     sortBy?: ((row: Row<T>) => string | number) | 'auto' | null; // Could also be by 'key' string but 'auto' could be a key
     isReactive?: boolean; // Not working yet
-
+    summary?(table: SwTable<T>): HTMLElement | string | null;
 }
 
 
@@ -35,6 +35,7 @@ class Column<T extends DataObject = DataObject> {
         this.col.dataset.id = this.colId;
         //this.isReactive = typeof settings.isReactive === 'boolean' ? settings.isReactive : true;
         this.#render = typeof settings.render === 'function' ? settings.render : null;
+        this.#summary = typeof settings.summary === 'function' ? settings.summary : null;
         if (typeof settings.sortBy === 'undefined') settings.sortBy = 'auto';
         this.sortBy = settings.sortBy;
         this.name = settings.name ?? '';
@@ -96,9 +97,21 @@ class Column<T extends DataObject = DataObject> {
         if (!table) return;
 
         for (const row of table.rows) {
+            // We get here when the render function of a column is changed post-init
             // Probably a cheaper way to do this. Can we target down the cells only?
             row.render();
         }
+    }
+
+    #summary: ColumnSettings<T>['summary'] | null;
+    get summary() {
+        return this.#summary;
+    }
+    set summary(fn: ColumnSettings<T>['summary'] | null) {
+        this.#summary= typeof fn === 'function' ? fn : null;
+        const table = this.#table;
+        if (!table) return;
+        this.#table._renderSummary();
     }
 
     #name = '';
@@ -119,7 +132,6 @@ class Column<T extends DataObject = DataObject> {
         if (!this.#table) return [];
         return this.#table.rowsCurrentPage.map((row: Row<T>) => row.cells[this.colId]) as Array<HTMLTableCellElement>;
     }
-
 
     moveLeft() {
         return this.moveTo(this.sortOrder - 1);
@@ -167,6 +179,7 @@ class Column<T extends DataObject = DataObject> {
         }
         this.#table.columnsObject[this.colId] = null;
         columnToTable.delete(this);
+        this.col.remove();
         this.th.remove();
         this.th = null as any;
     }
@@ -255,14 +268,5 @@ class BuiltInColumn {
         this.colId = type;
         this.th.classList.add('sw-table-th-built-in', `sw-table-th-built-in-${type}`);
         this.col.dataset.id = this.colId;
-    }
-    get #table() {
-        return columnToTable.get(this);
-    }
-    destroy() {
-        if (!this.#table) return;
-        this.#table.columnsObject[this.colId] = null;
-        columnToTable.delete(this);
-        this.th = null as any;
     }
 }

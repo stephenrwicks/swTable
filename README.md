@@ -1,7 +1,9 @@
 # SwTable
-document updated 12/21/24
+document updated 2/6/2025
 
 This is a work in progress.
+
+[[_TOC_]]
 
 ## Overview
 
@@ -24,7 +26,8 @@ Fully featured with
 - draggable, reorderable columns, 
 - selectable rows,
 - expandable detail rows, 
-- custom actions on each row, 
+- custom actions on each row,
+- customizable summary footer for totals, etc.,
 - CSS theming,
 - etc.
 

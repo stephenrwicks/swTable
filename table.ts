@@ -1,4 +1,4 @@
-// Introduce the concept of the Cell class. It seems like maintaining state of every cell is correct
+// Functional footer
 // 
 // Figure out data vs $data api
 // Paging buttons, paging dropdown - placement?
@@ -36,10 +36,14 @@
 import { Column, ColumnSettings, BuiltInColumn } from './column.js';
 import { Row } from './row.js';
 import { rowToTable, columnToTable } from './weakMaps.js';
-import { ActionSettings } from './actions.js';
 export { SwTable, DataObject };
 
 type DataObject = Record<string, unknown>;
+type ActionsArray = Array<{
+    text: string;
+    fn(): any;
+    disabled?(): boolean;
+}>
 
 type SwTableSettings<T extends DataObject = DataObject> = {
     columns: Array<ColumnSettings<T>>;
@@ -51,8 +55,8 @@ type SwTableSettings<T extends DataObject = DataObject> = {
     draggableColumns?: boolean;
     detailFn?(row: Row<T>): HTMLElement | string | null;
     checkboxFn?(row: Row<T>): boolean;
-    actionsFn?(row: Row<T>): ActionSettings<T> | null;
-    resizable?: 'both' | 'horizontal' | 'vertical';
+    actionsFn?(row: Row<T>): ActionsArray | null;
+    summaryFn?(table: SwTable<T>): HTMLElement | string | null;
 }
 
 class SwTable<T extends DataObject = DataObject> {
@@ -67,6 +71,8 @@ class SwTable<T extends DataObject = DataObject> {
         colgroup: document.createElement('colgroup'),
         tbody: document.createElement('tbody'),
         tfoot: document.createElement('tfoot'),
+        summaryTr: document.createElement('tr'),
+        summaryTd: document.createElement('td'),
         tfootTr: document.createElement('tr'),
         tfootTd: document.createElement('td'),
         tfootDiv: document.createElement('div'),
@@ -75,6 +81,7 @@ class SwTable<T extends DataObject = DataObject> {
         pageNumberDiv: document.createElement('div'),
         pageLengthSelect: document.createElement('select'),
         selectAllCheckbox: document.createElement('input'),
+
     };
 
     columnsObject: Record<string, Column<T> | BuiltInColumn | null> = {
@@ -95,13 +102,15 @@ class SwTable<T extends DataObject = DataObject> {
         if (typeof settings.detailFn === 'function') this.detailFn = settings.detailFn;
         if (typeof settings.actionsFn === 'function') this.actionsFn = settings.actionsFn;
         if (typeof settings.checkboxFn === 'function') this.checkboxFn = settings.checkboxFn;
+        if (typeof settings.summaryFn === 'function') this.summaryFn = settings.summaryFn;
+
         this.renderColumnTr();
 
         this.draggableColumns = !!settings.draggableColumns;
 
         this.pageLengthOptions = settings.pageLengthOptions ?? [0];
 
-        this.pageLength = Array.isArray(this.pageLengthOptions) ? this.pageLengthOptions[0] : 0;
+        this.#pageLength = Array.isArray(this.pageLengthOptions) ? this.pageLengthOptions[0] : 0;
 
         settings.showSearch ??= true;
         this.showSearch = !!settings.showSearch;
@@ -112,6 +121,7 @@ class SwTable<T extends DataObject = DataObject> {
         this.#els.headerTd.append(this.#els.headerDiv);
         headerTr.append(this.#els.headerTd);
         this.#els.headerTd.colSpan = 999;
+        this.#els.summaryTd.colSpan = 999;
         this.#els.thead.append(headerTr, this.#els.columnTr);
         this.#els.tfootDiv.append(this.#els.pageNumberDiv, this.#els.prevPageButton, this.#els.nextPageButton);
         this.#els.tfootTd.append(this.#els.tfootDiv);
@@ -119,6 +129,7 @@ class SwTable<T extends DataObject = DataObject> {
         this.#els.tfoot.append(this.#els.tfootTr);
         this.#els.table.append(this.#els.thead, this.#els.tbody, this.#els.tfoot);
         this.#els.wrapper.append(this.#els.table);
+        this.#els.summaryTr.append(this.#els.summaryTd);
         this.#els.headerDiv.classList.add('sw-table-header');
         this.#els.headerTd.classList.add('sw-table-header-td');
         this.#els.table.classList.add('sw-table');
@@ -132,12 +143,7 @@ class SwTable<T extends DataObject = DataObject> {
         this.#els.pageLengthSelect.addEventListener('change', () => this.pageLength = Number(this.#els.pageLengthSelect.value));
 
         this.#els.table.dataset.swTableTheme = typeof settings.theme === 'string' ? settings.theme : '';
-        if (typeof settings.pageLength === 'number') {
-            this.pageLength = settings.pageLength;
-        }
-        else {
-            this.goToPage(1);
-        }
+        if (typeof settings.pageLength === 'number') this.#pageLength = settings.pageLength;
 
         this.#els.selectAllCheckbox.type = 'checkbox';
         this.#els.selectAllCheckbox.addEventListener('change', () => this.toggleCheckAllRows());
@@ -155,12 +161,6 @@ class SwTable<T extends DataObject = DataObject> {
         prevIcon.className = 'sw-table-icon sw-table-chevron';
         this.#els.nextPageButton.append(nextIcon);
         this.#els.prevPageButton.append(prevIcon);
-
-        if (settings.resizable) {
-            this.#els.wrapper.style.overflow = 'auto';
-            this.#els.wrapper.style.resize = settings.resizable;
-        }
-
 
         if (Array.isArray(settings.data) && settings.data.length) this.setData(settings.data);
 
@@ -243,15 +243,7 @@ class SwTable<T extends DataObject = DataObject> {
     get rows() {
         return this.#rows;
     }
-
-    renderPage(targetPage: number) {
-        // To optimize, each row could have a "state" object
-        for (const row of this.rowsCurrentPage) {
-
-        }
-        // Fewer loops
-    }
-
+    
     insertRow(data: T, index?: number): Row<T> {
         const row = new Row<T>();
         rowToTable.set(row, this);
@@ -267,6 +259,10 @@ class SwTable<T extends DataObject = DataObject> {
         return row;
     }
 
+    sortCustom(customSortFn: () => any) {
+        // Has to be some comparison fn
+    }
+
     // This is where the detailRow is defined
     #detailFn: SwTableSettings<T>['detailFn'] | null = null;
     get detailFn() {
@@ -274,12 +270,7 @@ class SwTable<T extends DataObject = DataObject> {
     }
     set detailFn(fn: SwTableSettings<T>['detailFn'] | null) {
         this.#detailFn = fn;
-        if (typeof this.#detailFn === 'function') {
-            this.columnsObject.detail ??= new BuiltInColumn('detail');
-        }
-        else {
-            this.columnsObject.detail?.destroy();
-        }
+        this.columnsObject.detail = typeof this.#detailFn === 'function' ? new BuiltInColumn('detail') : null;
         if (!this.rows.length) return;
         this.renderColumnTr();
         for (const row of this.rows) {
@@ -295,14 +286,8 @@ class SwTable<T extends DataObject = DataObject> {
     }
     set checkboxFn(fn: SwTableSettings<T>['checkboxFn'] | null) {
         this.#checkboxFn = fn;
-        if (typeof this.#checkboxFn === 'function') {
-            this.columnsObject.checkbox ??= new BuiltInColumn('checkbox');
-            this.columnsObject.checkbox.th.append(this.#els.selectAllCheckbox);
-
-        }
-        else {
-            this.columnsObject.checkbox?.destroy();
-        }
+        this.columnsObject.checkbox = typeof this.#checkboxFn === 'function' ? new BuiltInColumn('checkbox') : null;
+        if (this.columnsObject.checkbox) this.columnsObject.checkbox.th.append(this.#els.selectAllCheckbox);
         if (!this.rows.length) return;
         this.renderColumnTr();
         for (const row of this.rows) row.render();
@@ -314,15 +299,19 @@ class SwTable<T extends DataObject = DataObject> {
     }
     set actionsFn(fn: SwTableSettings<T>['actionsFn'] | null) {
         this.#actionsFn = fn;
-        if (typeof this.#actionsFn === 'function') {
-            this.columnsObject.actions ??= new BuiltInColumn('actions');
-        }
-        else {
-            this.columnsObject.actions?.destroy();
-        }
+        this.columnsObject.actions = typeof this.#actionsFn === 'function' ? new BuiltInColumn('actions') : null;
         if (!this.rows.length) return;
         this.renderColumnTr();
         for (const row of this.rows) row.render();
+    }
+
+    #summaryFn: SwTableSettings<T>['summaryFn'] | null = null;
+    get summaryFn() {
+        return this.#summaryFn;
+    }
+    set summaryFn(fn: SwTableSettings<T>['summaryFn'] | null) {
+        this.#summaryFn = fn;
+        this._renderSummary();
     }
 
     #filters: Array<(row: Row<T>) => boolean> | null = null;
@@ -455,6 +444,7 @@ class SwTable<T extends DataObject = DataObject> {
 
     // This is the single DOM placement method
     goToPage(n: number) {
+        console.log('test');
         if (typeof n !== 'number') return;
         n = Math.floor(n);
         if (n < 1) n = 1;
@@ -467,6 +457,8 @@ class SwTable<T extends DataObject = DataObject> {
             this.#els.tbody.append(row.tr);
             if (row.detail && row.detailIsVisible) this.#els.tbody.append(row.detail.tr);
         });
+
+        this._renderSummary();
 
         const first = this.rowsFilterTrue.indexOf(rowsToShow[0]) + 1;
         const last = this.rowsFilterTrue.indexOf(rowsToShow[rowsToShow.length - 1]) + 1;
@@ -498,31 +490,45 @@ class SwTable<T extends DataObject = DataObject> {
         }
     }
 
-    columnModal() {
+    _renderSummary() {
+        if (typeof this.#summaryFn === 'function') {
+            const contents = this.#summaryFn(this);
+            this.#els.summaryTd.replaceChildren(contents ?? '');
+            this.#els.tfoot.prepend(this.#els.summaryTr);
+        }
+        else {
+            this.#els.summaryTr.remove();
+        }
+    }
 
-        const modal = document.createElement('dialog');
-        this.#els.wrapper.append(modal);
-        for (const col of this.columns) {
+    settingsDialog() {
+
+        const dialog = document.createElement('dialog');
+        dialog.classList.add('sw-table-column-dialog');
+        this.#els.wrapper.append(dialog);
+        const labels = this.columns.map(col => {
             const label = document.createElement('label');
             const checkbox = document.createElement('input');
+            checkbox.checked = col.isShowing;
             checkbox.type = 'checkbox';
+            checkbox.className = 'sw-table-checkbox';
+            checkbox.addEventListener('change', () => {
+                if (checkbox.checked) col.show();
+                else col.hide();
+            })
             label.append(checkbox, col.name);
-            checkbox.value = col.colId;
-            modal.append(label);
-        }
-        modal.addEventListener('keydown', (e) => {
-            if (e.key !== 'Enter') return;
-            // calling show() hide() on each individually is a lot of renders
-            modal.querySelectorAll('input').forEach(checkbox => {
-                const col = this.columnsObject[checkbox.value];
-                if (col instanceof Column && checkbox.checked) col.show();
-                if (col instanceof Column && !checkbox.checked) col.hide();
-                modal.remove();
-            });
+            return label;
         });
-        modal.showModal();
+        dialog.append(...labels);
 
+        dialog.show();
+        dialog.style.left = '0px';
 
+        dialog.addEventListener('cancel', () => {
+            dialog.remove();
+        });
     }
+
+
 
 }

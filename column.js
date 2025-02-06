@@ -21,6 +21,7 @@ class Column {
         this.col.dataset.id = this.colId;
         //this.isReactive = typeof settings.isReactive === 'boolean' ? settings.isReactive : true;
         this.#render = typeof settings.render === 'function' ? settings.render : null;
+        this.#summary = typeof settings.summary === 'function' ? settings.summary : null;
         if (typeof settings.sortBy === 'undefined')
             settings.sortBy = 'auto';
         this.sortBy = settings.sortBy;
@@ -81,9 +82,21 @@ class Column {
         if (!table)
             return;
         for (const row of table.rows) {
+            // We get here when the render function of a column is changed post-init
             // Probably a cheaper way to do this. Can we target down the cells only?
             row.render();
         }
+    }
+    #summary;
+    get summary() {
+        return this.#summary;
+    }
+    set summary(fn) {
+        this.#summary = typeof fn === 'function' ? fn : null;
+        const table = this.#table;
+        if (!table)
+            return;
+        this.#table._renderSummary();
     }
     #name = '';
     get name() {
@@ -153,6 +166,7 @@ class Column {
         }
         this.#table.columnsObject[this.colId] = null;
         columnToTable.delete(this);
+        this.col.remove();
         this.th.remove();
         this.th = null;
     }
@@ -243,15 +257,5 @@ class BuiltInColumn {
         this.colId = type;
         this.th.classList.add('sw-table-th-built-in', `sw-table-th-built-in-${type}`);
         this.col.dataset.id = this.colId;
-    }
-    get #table() {
-        return columnToTable.get(this);
-    }
-    destroy() {
-        if (!this.#table)
-            return;
-        this.#table.columnsObject[this.colId] = null;
-        columnToTable.delete(this);
-        this.th = null;
     }
 }

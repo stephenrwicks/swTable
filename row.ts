@@ -1,13 +1,11 @@
 import { Detail } from './detail.js';
-import { Actions } from './actions.js';
 import { Observable } from './observable.js';
-import { rowToTable, actionsToRow } from './weakMaps.js';
+import { rowToTable } from './weakMaps.js';
 import { SwTable, DataObject } from './table.js';
 export { Row };
 
 class Row<T extends DataObject = DataObject> {
 
-    // Needs to be typed with a generic
     // Force initialization with an empty object that is typed as T
     #observable = new Observable<T>({} as T);
 
@@ -112,35 +110,49 @@ class Row<T extends DataObject = DataObject> {
             this.checkbox = null;
         }
     }
-    #actions: Actions<T> | null = null;
+
     actionsButton: HTMLButtonElement | null = null;
     renderActions() {
         if (!this.#table) return;
-        const actionsArray = this.#table.actionsFn ? this.#table.actionsFn(this) : null;
-        if (actionsArray === null) {
-            this.#actions?.div.remove();
-            if (this.#actions) actionsToRow.delete(this.#actions);
-            this.#actions = null;
+        const actionsArray = typeof this.#table.actionsFn === 'function' ? this.#table.actionsFn(this) : null;
+        if (!Array.isArray(actionsArray) || !actionsArray.length) {
             this.actionsButton?.remove();
             this.actionsButton = null
         }
-        else {
-            if (!Array.isArray(actionsArray)) throw new Error('swTable - Actions have to be an array.')
-            this.#actions ??= new Actions();
-            actionsToRow.set(this.#actions, this);
-            this.#actions.render(actionsArray); // Possibly we render actions on click instead, saving time
-            if (this.actionsButton === null) {
-                this.actionsButton = document.createElement('button');
-                const icon = document.createElement('div');
-                icon.className = 'sw-table-icon sw-table-ellipsis'
-                this.actionsButton.type = 'button';
-                this.actionsButton.title = 'Toggle Actions';
-                this.actionsButton.className = 'sw-table-button sw-table-actions-button sw-table-button-circle';
-                this.actionsButton.addEventListener('click', () => this.toggleActions());
-                this.actionsButton.append(icon);
-                this.cells.actions?.append(this.actionsButton);
-            }
+        else if (this.actionsButton === null) {
+            this.actionsButton = document.createElement('button');
+            const icon = document.createElement('div');
+            icon.className = 'sw-table-icon sw-table-ellipsis'
+            this.actionsButton.type = 'button';
+            this.actionsButton.title = 'Toggle Actions';
+            this.actionsButton.className = 'sw-table-button sw-table-actions-button sw-table-button-circle';
+            this.actionsButton.addEventListener('click', () => this.toggleActions());
+            this.actionsButton.append(icon);
+            this.cells.actions?.append(this.actionsButton);
         }
+    }
+
+    #buildActionsDiv(): HTMLDivElement | null {
+        if (!this.#table) return null;
+        if (typeof this.#table.actionsFn !== 'function') return null;
+        const actions = this.#table.actionsFn(this);
+        if (!actions) return null;
+        if (!actions.length) return null;
+        const div = document.createElement('div');
+        div.classList.add('sw-table-actions-div');
+        for (const item of actions) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.classList.add('sw-table-button');
+            if (typeof item.disabled === 'function') btn.disabled = !!item.disabled();
+            btn.addEventListener('click', () => {
+                item.fn();
+                this.hideActions();
+            });
+            btn.textContent = item.text ?? '';
+            div.append(btn);
+        }
+        return div;
     }
 
     #tr = document.createElement('tr');
@@ -154,7 +166,7 @@ class Row<T extends DataObject = DataObject> {
     setData(data: T) {
         this.#observable.target = data;
         this.#observable.callbacks = [];
-        this.#observable.callbacks.push(this.render.bind(this));
+        this.#observable.callbacks.push(this.render.bind(this), () => this.#table._renderSummary());
         this.render();
     }
 
@@ -220,15 +232,17 @@ class Row<T extends DataObject = DataObject> {
     }
     #actionsAreOpen = false;
     showActions() {
-        if (!this.#actions || this.#actionsAreOpen || !this.actionsButton || !this.cells.actions) return;
-        this.cells.actions.append(this.#actions.div);
+        if (this.#actionsAreOpen || !this.actionsButton || !this.cells.actions) return;
+        const actionsDiv = this.#buildActionsDiv();
+        if (!actionsDiv) return;
+        this.cells.actions.append(actionsDiv);
         document.addEventListener('click', this.#dismissActionsEvent);
         this.#actionsAreOpen = true;
     }
     hideActions() {
-        if (!this.#actions || !this.#actionsAreOpen) return;
+        if (!this.#actionsAreOpen) return;
         this.#actionsAreOpen = false;
-        this.#actions.div.remove();
+        this.cells.actions?.querySelector('.sw-table-actions-div')?.remove();
         document.removeEventListener('click', this.#dismissActionsEvent);
     }
     toggleActions() {
@@ -245,8 +259,6 @@ class Row<T extends DataObject = DataObject> {
         this.detail = null;
         if (this.checkbox) this.#table?.updateSelectAllCheckbox();
         this.checkbox = null;
-        if (this.#actions) actionsToRow.delete(this.#actions);
-        this.#actions = null;
         this.#tr.remove();
         this.#tr = null as any;
         this.#observable.destroy();
