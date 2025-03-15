@@ -14,6 +14,7 @@
 // make dragover have one listener that is applied to the entire table / thead + tbody. locates column to swap
 // onRender() callback on row, onDataChange()
 // onOpenDetails()
+// Event delegation to the parent element. Would require searching for the row on click, which is a bit weird
 // Introduce the <colgroup> and <col> elements
 // Introduce caption element
 // Add row button, add row dialog (Would need a create modal built in)
@@ -41,21 +42,25 @@ class SwTable {
         colgroup: document.createElement('colgroup'),
         tbody: document.createElement('tbody'),
         tfoot: document.createElement('tfoot'),
-        summaryTr: document.createElement('tr'),
-        summaryTd: document.createElement('td'),
+        overallSummaryTr: document.createElement('tr'),
+        overallSummaryTd: document.createElement('td'),
+        colSummaryTr: document.createElement('tr'),
         tfootTr: document.createElement('tr'),
         tfootTd: document.createElement('td'),
-        tfootDiv: document.createElement('div'),
+        pagingDiv: document.createElement('div'),
         nextPageButton: document.createElement('button'),
         prevPageButton: document.createElement('button'),
         pageNumberDiv: document.createElement('div'),
         pageLengthSelect: document.createElement('select'),
         selectAllCheckbox: document.createElement('input'),
+        filterButton: document.createElement('button'),
+        searchInput: document.createElement('input'),
+        searchWrapper: document.createElement('div'),
     };
     columnsObject = {
-        detail: null,
-        checkbox: null,
-        actions: null
+        builtInDetail: null,
+        builtInCheckbox: null,
+        builtInActions: null
     };
     constructor(settings) {
         if (!settings?.columns)
@@ -72,36 +77,51 @@ class SwTable {
             this.actionsFn = settings.actionsFn;
         if (typeof settings.checkboxFn === 'function')
             this.checkboxFn = settings.checkboxFn;
-        if (typeof settings.summaryFn === 'function')
-            this.summaryFn = settings.summaryFn;
+        if (typeof settings.overallSummaryFn === 'function')
+            this.overallSummaryFn = settings.overallSummaryFn;
         this.renderColumnTr();
         this.draggableColumns = !!settings.draggableColumns;
         this.pageLengthOptions = settings.pageLengthOptions ?? [0];
-        this.#pageLength = Array.isArray(this.pageLengthOptions) ? this.pageLengthOptions[0] : 0;
+        this.#els.headerDiv.append(this.#els.pageLengthSelect);
         settings.showSearch ??= true;
         this.showSearch = !!settings.showSearch;
+        this.#els.searchWrapper.classList.add('sw-table-search-wrapper');
+        const searchIcon = document.createElement('div');
+        searchIcon.className = 'sw-table-icon sw-table-magnifying-glass';
+        this.#els.searchInput.type = 'text';
+        this.#els.searchInput.title = 'Search';
+        this.#els.searchInput.classList.add('sw-table-search');
+        this.#els.searchInput.addEventListener('input', () => {
+            // could debounce this
+            this.goToPage(1);
+            this.updateSelectAllCheckbox();
+        });
+        this.#els.searchWrapper.append(searchIcon, this.#els.searchInput);
+        this.#els.headerDiv.append(this.#els.searchWrapper);
         this.#els.table.append(this.#els.colgroup);
         const headerTr = document.createElement('tr');
         this.#els.headerTd.append(this.#els.headerDiv);
         headerTr.append(this.#els.headerTd);
         this.#els.headerTd.colSpan = 999;
-        this.#els.summaryTd.colSpan = 999;
+        this.#els.overallSummaryTd.colSpan = 999;
         this.#els.thead.append(headerTr, this.#els.columnTr);
-        this.#els.tfootDiv.append(this.#els.pageNumberDiv, this.#els.prevPageButton, this.#els.nextPageButton);
-        this.#els.tfootTd.append(this.#els.tfootDiv);
+        this.#els.pagingDiv.append(this.#els.pageNumberDiv, this.#els.prevPageButton, this.#els.nextPageButton);
+        this.#els.tfootTd.append(this.#els.pagingDiv);
         this.#els.tfootTr.append(this.#els.tfootTd);
         this.#els.tfoot.append(this.#els.tfootTr);
         this.#els.table.append(this.#els.thead, this.#els.tbody, this.#els.tfoot);
         this.#els.wrapper.append(this.#els.table);
-        this.#els.summaryTr.append(this.#els.summaryTd);
+        this.#els.overallSummaryTr.append(this.#els.overallSummaryTd);
         this.#els.headerDiv.classList.add('sw-table-header');
         this.#els.headerTd.classList.add('sw-table-header-td');
         this.#els.table.classList.add('sw-table');
         this.#els.wrapper.classList.add('sw-table-wrapper');
-        this.#els.tfootDiv.classList.add('sw-table-tfoot-div');
+        this.#els.pagingDiv.classList.add('sw-table-paging-div');
         this.#els.pageNumberDiv.classList.add('sw-table-page-number-div');
         this.#els.selectAllCheckbox.classList.add('sw-table-checkbox');
         this.#els.pageLengthSelect.classList.add('sw-table-page-length-select');
+        this.#els.overallSummaryTr.classList.add('sw-table-overall-summary-tr');
+        this.#els.colSummaryTr.classList.add('sw-table-col-summary-tr');
         this.#els.selectAllCheckbox.title = 'Toggle All';
         this.#els.pageLengthSelect.addEventListener('change', () => this.pageLength = Number(this.#els.pageLengthSelect.value));
         this.#els.table.dataset.swTableTheme = typeof settings.theme === 'string' ? settings.theme : '';
@@ -123,6 +143,15 @@ class SwTable {
         prevIcon.className = 'sw-table-icon sw-table-chevron';
         this.#els.nextPageButton.append(nextIcon);
         this.#els.prevPageButton.append(prevIcon);
+        this.#els.filterButton.type = 'button';
+        this.#els.filterButton.title = 'Filters';
+        this.#els.filterButton.className = 'sw-table-button sw-table-filter-button sw-table-button-circle';
+        const filterIcon = document.createElement('div');
+        filterIcon.className = 'sw-table-icon sw-table-filter-icon';
+        this.#els.filterButton.append(filterIcon);
+        this.#els.filterButton.addEventListener('click', () => this.filtersDialog());
+        this.#uiFilters = settings.uiFilters;
+        this.#els.headerDiv.append(this.#els.filterButton);
         if (Array.isArray(settings.data) && settings.data.length)
             this.setData(settings.data);
     }
@@ -221,6 +250,7 @@ class SwTable {
         if (!this.rows.length)
             return;
         this.renderColumnTr();
+        this._renderSummaries();
         for (const row of this.rows) {
             row.hideDetail();
             row.render();
@@ -238,6 +268,7 @@ class SwTable {
         if (!this.rows.length)
             return;
         this.renderColumnTr();
+        this._renderSummaries();
         for (const row of this.rows)
             row.render();
     }
@@ -251,16 +282,17 @@ class SwTable {
         if (!this.rows.length)
             return;
         this.renderColumnTr();
+        this._renderSummaries();
         for (const row of this.rows)
             row.render();
     }
-    #summaryFn = null;
-    get summaryFn() {
-        return this.#summaryFn;
+    #overallSummaryFn = null;
+    get overallSummaryFn() {
+        return this.#overallSummaryFn;
     }
-    set summaryFn(fn) {
-        this.#summaryFn = fn;
-        this._renderSummary();
+    set overallSummaryFn(fn) {
+        this.#overallSummaryFn = fn;
+        this._renderSummaries();
     }
     #filters = null;
     get filters() {
@@ -270,54 +302,46 @@ class SwTable {
         this.#filters = filters;
         this.goToPage(1);
     }
+    #uiFilters = null;
+    get uiFilters() {
+        return this.#uiFilters;
+    }
+    set uiFilters(filters) {
+        this.#uiFilters = filters;
+    }
     #pageLengthOptions = null;
     get pageLengthOptions() {
         return this.#pageLengthOptions;
     }
     set pageLengthOptions(options) {
-        if (!Array.isArray(options) || !options.length) {
+        if (!Array.isArray(options) || !options.length || options.some(n => typeof n !== 'number')) {
             this.#pageLengthOptions = [0];
         }
         else {
             this.#pageLengthOptions = options;
         }
         this.#els.pageLengthSelect.replaceChildren();
-        if (this.#pageLengthOptions.length > 1) {
+        if (this.#pageLengthOptions.length === 1) {
+            this.#els.pageLengthSelect.style.display = 'none';
+        }
+        else {
             for (const n of this.#pageLengthOptions.sort((a, b) => a - b)) {
                 this.#els.pageLengthSelect.add(new Option(n === 0 ? 'All' : String(n), String(n)));
             }
-            this.#els.headerDiv.append(this.#els.pageLengthSelect);
+            this.#els.pageLengthSelect.style.display = '';
         }
+        this.pageLength = this.#pageLengthOptions[0];
     }
     #showSearch = false;
-    searchInput = null;
+    get searchInput() {
+        return this.#els.searchInput;
+    }
     get showSearch() {
         return this.#showSearch;
     }
     set showSearch(bool) {
-        bool = !!bool;
-        if (!this.#showSearch && bool) {
-            const searchWrapper = document.createElement('div');
-            searchWrapper.classList.add('sw-table-search-wrapper');
-            const searchIcon = document.createElement('div');
-            searchIcon.className = 'sw-table-icon sw-table-magnifying-glass';
-            this.searchInput ??= document.createElement('input');
-            this.searchInput.type = 'text';
-            this.searchInput.title = 'Search';
-            this.searchInput.classList.add('sw-table-search');
-            this.searchInput.addEventListener('input', () => {
-                this.goToPage(1);
-                this.updateSelectAllCheckbox();
-            });
-            searchWrapper.append(searchIcon, this.searchInput);
-            this.#els.headerDiv.append(searchWrapper);
-        }
-        else if (this.#showSearch && !bool) {
-            this.searchInput?.parentElement?.remove();
-            this.searchInput?.remove();
-            this.searchInput = null;
-        }
         this.#showSearch = !!bool;
+        this.#els.searchWrapper.style.display = this.#showSearch ? '' : 'none';
     }
     #currentPage = 1;
     get currentPage() {
@@ -332,6 +356,7 @@ class SwTable {
         return Math.ceil(this.rowsFilterTrue.length / this.#pageLength);
     }
     get rowsFilterTrue() {
+        // This can get pretty expensive fast
         return this.rows.filter(row => row.isFilterTrue);
     }
     get #rowsFilterTruePartitionedByPage() {
@@ -356,7 +381,7 @@ class SwTable {
             row.isChecked = false;
     }
     toggleCheckAllRows() {
-        if (this.rowsFilterTrue.filter(row => !!row.checkbox).some(row => !row.isChecked)) {
+        if (this.rowsFilterTrue.some(row => row.checkbox && !row.isChecked)) {
             this.checkAllRows();
         }
         else {
@@ -365,8 +390,8 @@ class SwTable {
     }
     updateSelectAllCheckbox() {
         this.#els.selectAllCheckbox.style.visibility = this.rowsFilterTrue.some(row => !!row.checkbox) ? 'visible' : 'hidden';
-        const allChecked = this.rowsFilterTrue.filter(row => !!row.checkbox).every(row => row.isChecked);
-        const someChecked = this.rowsFilterTrue.filter(row => !!row.checkbox).some(row => row.isChecked);
+        const allChecked = this.rowsFilterTrue.every(row => row.isChecked);
+        const someChecked = this.rowsFilterTrue.some(row => row.isChecked);
         this.#els.selectAllCheckbox.checked = allChecked;
         this.#els.selectAllCheckbox.indeterminate = !allChecked && someChecked;
     }
@@ -376,11 +401,12 @@ class SwTable {
     }
     set pageLength(n) {
         this.#pageLength = n;
+        this.#els.pageLengthSelect.value = String(n);
         this.goToPage(1);
     }
     // This is the single DOM placement method
+    // Update select all should be in here
     goToPage(n) {
-        console.log('test');
         if (typeof n !== 'number')
             return;
         n = Math.floor(n);
@@ -397,13 +423,15 @@ class SwTable {
             if (row.detail && row.detailIsVisible)
                 this.#els.tbody.append(row.detail.tr);
         });
-        this._renderSummary();
-        const first = this.rowsFilterTrue.indexOf(rowsToShow[0]) + 1;
-        const last = this.rowsFilterTrue.indexOf(rowsToShow[rowsToShow.length - 1]) + 1;
+        this._renderSummaries();
+        const rowsFilterTrue = this.rowsFilterTrue;
+        const first = rowsFilterTrue.indexOf(rowsToShow[0]) + 1;
+        const last = rowsFilterTrue.indexOf(rowsToShow[rowsToShow.length - 1]) + 1;
         this.#els.tfootTd.colSpan = this.colSpan;
-        this.#els.pageNumberDiv.textContent = `Showing ${first}-${last} of ${this.rowsFilterTrue.length}`;
+        this.#els.pageNumberDiv.textContent = `Showing ${first}-${last} of ${rowsFilterTrue.length}`;
         this.#els.nextPageButton.style.visibility = this.currentPage < this.numberOfPages ? 'visible' : 'hidden';
         this.#els.prevPageButton.style.visibility = this.currentPage > 1 ? 'visible' : 'hidden';
+        //this.updateSelectAllCheckbox();
     }
     renderColumnTr() {
         this.#els.colgroup.replaceChildren();
@@ -427,14 +455,37 @@ class SwTable {
             this.#els.colgroup.append(this.columnsObject.checkbox.col);
         }
     }
-    _renderSummary() {
-        if (typeof this.#summaryFn === 'function') {
-            const contents = this.#summaryFn(this);
-            this.#els.summaryTd.replaceChildren(contents ?? '');
-            this.#els.tfoot.prepend(this.#els.summaryTr);
+    _renderSummaries() {
+        // We potentially have an overall summary cell for the table
+        // and/or a summary cell for each column
+        // Overall summary
+        if (typeof this.#overallSummaryFn === 'function') {
+            const contents = this.#overallSummaryFn(this);
+            this.#els.overallSummaryTd.replaceChildren(contents ?? '');
+            this.#els.tfoot.prepend(this.#els.overallSummaryTr);
         }
         else {
-            this.#els.summaryTr.remove();
+            this.#els.overallSummaryTr.remove();
+        }
+        // Col-by-col summary
+        // Must rerender on column change, delete, move
+        // Should be able to change summary fn for each col
+        if (this.columns.some(col => typeof col.summary === 'function')) {
+            this.#els.colSummaryTr.replaceChildren();
+            if (this.columnsObject.detail) {
+                this.#els.colSummaryTr.append(document.createElement('td'));
+            }
+            for (const col of this.columns) {
+                col.summaryTd.replaceChildren(col.summary?.(this) ?? '');
+                this.#els.colSummaryTr.append(col.summaryTd);
+            }
+            if (this.columnsObject.actions) {
+                this.#els.colSummaryTr.append(document.createElement('td'));
+            }
+            if (this.columnsObject.checkbox) {
+                this.#els.colSummaryTr.append(document.createElement('td'));
+            }
+            this.#els.tfoot.prepend(this.#els.colSummaryTr);
         }
     }
     settingsDialog() {
@@ -447,8 +498,8 @@ class SwTable {
             checkbox.checked = col.isShowing;
             checkbox.type = 'checkbox';
             checkbox.className = 'sw-table-checkbox';
-            checkbox.addEventListener('change', () => {
-                if (checkbox.checked)
+            checkbox.addEventListener('change', (e) => {
+                if (e.target.checked)
                     col.show();
                 else
                     col.hide();
@@ -459,8 +510,41 @@ class SwTable {
         dialog.append(...labels);
         dialog.show();
         dialog.style.left = '0px';
-        dialog.addEventListener('cancel', () => {
-            dialog.remove();
+        // Cancel only applies to showModal, not show()
+        dialog.addEventListener('cancel', (e) => {
+            e.target.remove();
         });
+    }
+    filtersDialog() {
+        if (!this.#uiFilters?.length)
+            return;
+        let dialog = document.createElement('dialog');
+        dialog.classList.add('sw-table-filters-dialog');
+        this.#els.wrapper.append(dialog);
+        // Need some way to track which UIFilter is in "active" state
+        let labels = this.#uiFilters.map(f => {
+            const label = document.createElement('label');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'sw-table-checkbox';
+            checkbox.checked = !!f.isActive;
+            label.append(checkbox, f.text);
+            return label;
+        });
+        dialog.append(...labels);
+        dialog.showModal();
+        // Cancel only applies to showModal, not show()
+        dialog.addEventListener('cancel', (e) => {
+            e.target.remove();
+            dialog = null;
+            labels = null;
+        });
+        dialog.addEventListener('change', () => {
+        });
+    }
+    #buildModal() {
+        // return some kind of modal with event listeners on it
+    }
+    destroy() {
     }
 }

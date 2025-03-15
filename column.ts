@@ -5,6 +5,7 @@ export { Column, ColumnSettings, BuiltInColumn };
 type ColumnSettings<T extends DataObject> = {
     render: (row: Row<T>) => HTMLElement | string;
     name?: string;
+    //width?: string;
     sortBy?: ((row: Row<T>) => string | number) | 'auto' | null; // Could also be by 'key' string but 'auto' could be a key
     isReactive?: boolean; // Not working yet
     summary?(table: SwTable<T>): HTMLElement | string | null;
@@ -14,9 +15,9 @@ type ColumnSettings<T extends DataObject> = {
 class Column<T extends DataObject = DataObject> {
 
     th = document.createElement('th');
+    summaryTd = document.createElement('td');
     col = document.createElement('col');
     colId = crypto.randomUUID();
-
     sortOrder = -1;
 
     constructor(settings: ColumnSettings<T>) {
@@ -28,10 +29,11 @@ class Column<T extends DataObject = DataObject> {
         thButton.classList.add('sw-table-button');
         thButton.append(span, icon);
         this.th.append(thButton);
-        //this.th.id = `_${this.colId}`;
         this.th.scope = 'col';
+        this.th.classList.add('sw-table-th');
         this.th.dataset.isAscending = 'false';
         this.th.dataset.isCurrentSort = 'false';
+        this.th.dataset.id = this.colId;
         this.col.dataset.id = this.colId;
         //this.isReactive = typeof settings.isReactive === 'boolean' ? settings.isReactive : true;
         this.#render = typeof settings.render === 'function' ? settings.render : null;
@@ -40,6 +42,10 @@ class Column<T extends DataObject = DataObject> {
         this.sortBy = settings.sortBy;
         this.name = settings.name ?? '';
         this.th.draggable = true;
+
+        this.summaryTd.classList.add('sw-table-col-summary-td');
+
+        //if (typeof settings.width === 'string') this.col.style.width = settings.width;
 
         this.th.addEventListener('dragstart', (e) => {
             const table = this.#table;
@@ -56,6 +62,7 @@ class Column<T extends DataObject = DataObject> {
             table.element.dataset.dragColId = this.colId; // Use table dataset to track dragged col
             this.cellsCurrentPage!.forEach(td => td.classList.add('sw-table-dragging'));
         });
+
         this.th.addEventListener('dragover', (e) => {
             e.preventDefault();
             const colId = this.#table!.element.dataset.dragColId as string;
@@ -72,6 +79,15 @@ class Column<T extends DataObject = DataObject> {
             this.th.style.width = '';
             this.cellsCurrentPage!.forEach(td => td.classList.remove('sw-table-dragging'));
         });
+        // Bug in chrome, I think drag is conflicting with hover highlight
+        // this.th.addEventListener('mouseover', () => {
+        //     this.th.style.backgroundColor = 'var(--color2)';
+        //     this.cells.forEach(el => el.style.backgroundColor = 'var(--color2)');
+        // });
+        // this.th.addEventListener('mouseout', () => {
+        //     this.th.style.backgroundColor = '';
+        //     this.cells.forEach(el => el.style.backgroundColor = '');
+        // });
     }
 
     // #isReactive = true;
@@ -108,10 +124,10 @@ class Column<T extends DataObject = DataObject> {
         return this.#summary;
     }
     set summary(fn: ColumnSettings<T>['summary'] | null) {
-        this.#summary= typeof fn === 'function' ? fn : null;
+        this.#summary = typeof fn === 'function' ? fn : null;
         const table = this.#table;
         if (!table) return;
-        this.#table._renderSummary();
+        this.#table._renderSummaries();
     }
 
     #name = '';
@@ -124,7 +140,7 @@ class Column<T extends DataObject = DataObject> {
     }
 
     get cells() {
-        if (!this.#table) return null;
+        if (!this.#table) return [];
         return this.#table.rows.map((row: Row<T>) => row.cells[this.colId]) as Array<HTMLTableCellElement>;
     }
 
@@ -150,7 +166,7 @@ class Column<T extends DataObject = DataObject> {
         if (this.sortOrder === index) return;
         const currentSortOrder = this.sortOrder;
         const targetSortOrder = index;
-        table.columns.forEach(col => {
+        for (const col of table.columns) {
             if (col === this) {
                 col.sortOrder = index; // Set the sortOrder for the moved column
             }
@@ -166,7 +182,7 @@ class Column<T extends DataObject = DataObject> {
                     col.sortOrder += 1;
                 }
             }
-        });
+        };
         table.renderColumnTr();
         for (const row of table.rows) row.render();
         return this.sortOrder;
@@ -245,7 +261,7 @@ class Column<T extends DataObject = DataObject> {
         this.#table.renderColumnTr();
         for (const row of this.#table.rows) row.render();
     }
-    
+
     hide() {
         if (!this.isShowing) return;
         this.isShowing = false;

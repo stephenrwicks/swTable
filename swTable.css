@@ -24,9 +24,6 @@
 
     }
 
-
-
-
     .sw-table {
         width: 100%;
         display: table;
@@ -42,6 +39,12 @@
         .sw-table-header-td {
             background-color: var(--headerBackgroundColor);
         }
+
+        /* Attempt to get column hover to work. Not possible without explicit numbering? */
+        /* &:has(thead tr .sw-table-th:nth-child(3):hover) tbody tr td:nth-child(3) {
+            background-color: var(--color2);
+        } */
+
 
         .sw-table-header {
             display: flex;
@@ -113,6 +116,10 @@
                 }
             }
 
+            &[data-is-checked="true"], &[data-is-checked="true"]:hover {
+                background-color: var(--rowSelectedColor);
+            }
+
         }
 
         /* tbody:empty::before {
@@ -122,8 +129,13 @@
     } */
 
 
+        tr:has(.sw-table-col-summary-td) {
+            background-color: var(--color2);
+            /* border-left: 1px solid blue;
+            border-right: 1px solid blue; */
+        }
 
-        .sw-table-tfoot-div {
+        .sw-table-paging-div {
             display: flex;
             justify-content: end;
             align-items: center;
@@ -238,13 +250,15 @@
             cursor: not-allowed;
         }
 
-        &:not(:disabled)focus-visible {
+        &:not(:disabled):focus-visible {
+            outline: 1px solid var(--buttonFocusColor);
+        }
+        &:not(:disabled):active {
             outline: 1px solid var(--buttonFocusColor);
         }
 
         &:not(:disabled):hover {
             color: var(--iconHover);
-
             .sw-table-icon {
                 fill: var(--iconHover);
             }
@@ -255,13 +269,17 @@
         border-radius: 50%;
         transition: background-color .15s;
 
-        &:hover {
+        &:not(:disabled):hover {
             background-color: var(--buttonHoverBackground);
         }
     }
 
 
     /* Default theme  */
+
+    --color1: lightblue;
+    --color2: #e8f4f8;
+
     --font: normal 1em Helvetica,
     Arial,
     sans-serif;
@@ -272,16 +290,17 @@
     --rowHoverBackgroundColor: #eaeaea;
     --rowHoverFontColor: var(--fontColor);
     --rowHoverIconColor: var(--fontColor);
-    --detailBackgroundColor: #e8f4f8;
+    --rowSelectedColor: var(--color2);
+    --detailBackgroundColor: var(--color2);
     --boxShadow: 0px 0px 2px 2px #ccc;
     --buttonFocusColor: darkblue;
     --innerBorderColor: #ccc;
     --outerBorderColor: #fff;
     --theadBackgroundColor: var(--rowOddBackgroundColor);
     --tfootBackgroundColor: var(--rowOddBackgroundColor);
-    --checkboxColor: lightblue;
-    --dragColor: #e8f4f8;
-    --buttonHoverBackground: lightblue;
+    --checkboxColor: var(--color1);
+    --dragColor: var(--color2);
+    --buttonHoverBackground: var(--color1);
 
 
 
@@ -311,6 +330,14 @@
     .sw-table-icon.sw-table-chevron {
         background-image: url('data:image/svg+xml,%3Csvg viewBox%3D%220 0 24 24%22 width%3D%2224%22 height%3D%2224%22 xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath d%3D%22M8.59 16.59L13.17 12L8.59 7.41L10 6L16 12L10 18L8.59 16.59Z%22 fill%3D%22currentColor%22/%3E%3C/svg%3E');
     }
+
+    .sw-table-icon.sw-table-filter-icon {
+        background-image: url('data:image/svg+xml,%3Csvg viewBox%3D%220 0 24 24%22 width%3D%2220%22 height%3D%2220%22 xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath d%3D%22M3 4h18l-7 10v4h-4v-4L3 4z%22 fill%3D%22none%22 stroke%3D%22currentColor%22 stroke-width%3D%222%22 stroke-linejoin%3D%22round%22/%3E%3C/svg%3E');
+        scale: 1;
+    }
+    
+    
+    
 
 
     &[data-sw-table-theme="mint"] {}

@@ -1,31 +1,52 @@
-// import { SwTable } from "./table.js";
 import { SwTable } from "./table.js";
 const x = new SwTable({
     pageLengthOptions: [5, 10, 20],
     columns: [
         {
             name: "ID",
-            render: row => String(row.data.id),
+            render(row) {
+                return String(row.data.id);
+            }
         },
         {
             name: "Name",
-            render: row => row.data.name,
+            render(row) {
+                return row.data.name;
+            }
         },
         {
             name: "Quantity",
-            render: row => String(row.data.quantity),
+            render(row) {
+                return String(row.data.quantity);
+            },
+            summary(table) {
+                let totalQ = 0;
+                // This is maybe a little too verbose. Should an implementation need to know about the entire table
+                for (const row of table.rowsFilterTrue) {
+                    totalQ += row.data.quantity;
+                }
+                return `${totalQ}`;
+            }
         },
         {
             name: "Price",
-            render: row => `$${row.data.price.toFixed(2)}`,
+            render(row) {
+                return row.data.price.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+            },
         },
         {
             name: "Discount",
-            render: row => (row.data.discount ? "Yes" : "No"),
+            render(row) {
+                return String(row.data.discount);
+            }
         },
         {
             name: "Total",
-            render: row => `$${(row.data.quantity * row.data.price).toFixed(2)}`,
+            render(row) {
+                // Maybe some floating point inaccuracy
+                const total = row.data.quantity * row.data.price;
+                return total.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+            }
         },
     ],
     data: [
@@ -71,7 +92,7 @@ const x = new SwTable({
                 fn() {
                     row.$data.price += 5;
                 },
-                disabled: () => row.data.price > 100,
+                disabled: () => row.data.price > 100
             },
             {
                 text: "Change Quantity",
@@ -95,14 +116,22 @@ const x = new SwTable({
     checkboxFn(row) {
         return row.data.quantity > 3;
     },
-    summaryFn(table) {
+    overallSummaryFn(table) {
         let total = 0;
         for (const row of table.rowsFilterTrue) {
             total += row.data.quantity * row.data.price;
         }
         return `Total: ${total.toFixed(2)}`;
     },
+    uiFilters: [
+        {
+            text: 'Price is over $5',
+            fn(row) {
+                return row.data.price > 10;
+            },
+            isActive: false
+        }
+    ]
 });
 document.body.append(x.element);
-//@ts-ignore
 window.x = x;

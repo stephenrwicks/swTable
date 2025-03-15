@@ -12,7 +12,7 @@ class Row {
         actions: null
     };
     constructor() {
-        this.#tr.dataset.uuid = this.rowId;
+        this.#tr.dataset.id = this.rowId;
     }
     get #table() {
         return rowToTable.get(this);
@@ -161,8 +161,10 @@ class Row {
     // Displaying proxied data will work, but requires more overhead
     setData(data) {
         this.#observable.target = data;
-        this.#observable.callbacks = [];
-        this.#observable.callbacks.push(this.render.bind(this), () => this.#table._renderSummary());
+        this.#observable.callbacks = [
+            () => this.render(),
+            () => this.#table._renderSummaries()
+        ];
         this.render();
     }
     get $data() {
@@ -176,34 +178,51 @@ class Row {
         return structuredClone(this.#observable.target);
     }
     get isSearchMatch() {
-        if (!this.#table)
+        // Gets all text nodes at the top level of each element in the row and detail row.
+        // This prevents false positives due to nested elements.
+        // Therefore we can exclude certain elements by giving them an "ignore" class
+        // 3-15-25 I tried to make this efficient by removing spreads, filters, maps, etc
+        // and just using for...of with as much short circuiting as possible
+        console.log('hello');
+        const t = this.#table;
+        if (!t)
             return false;
-        const searchInput = this.#table.searchInput;
-        if (!searchInput)
+        const searchInput = t.searchInput;
+        if (!searchInput.value)
             return true;
-        const text = searchInput.value?.trim().toLowerCase();
-        if (!text)
+        const searchText = searchInput.value?.trim().toLowerCase();
+        if (!searchText)
             return true;
-        let els = [...this.tr.querySelectorAll('*:not(.sw-table-search-ignore *)')];
-        if (this.detail?.tr)
-            els = [...els, ...this.detail.tr.querySelectorAll('*:not(.sw-table-search-ignore *)')];
-        return els.map(el => [...el.childNodes]
-            .filter(n => n.nodeType === Node.TEXT_NODE)
-            .map(n => n.textContent).join(' ')
-            .toLowerCase())
-            .some(str => str.includes(text));
+        for (const el of this.tr.querySelectorAll('*:not(.sw-table-search-ignore *)')) {
+            for (const node of el.childNodes) {
+                if (node.nodeType === Node.TEXT_NODE && node.textContent?.toLowerCase().includes(searchText))
+                    return true;
+            }
+        }
+        if (!this.detail?.tr)
+            return false;
+        for (const el of this.detail?.tr.querySelectorAll('*:not(.sw-table-search-ignore *)')) {
+            for (const node of el.childNodes) {
+                if (node.nodeType === Node.TEXT_NODE && node.textContent?.toLowerCase().includes(searchText))
+                    return true;
+            }
+        }
+        return false;
     }
     ;
     get isFilterTrue() {
-        if (!this.#table)
+        const t = this.#table;
+        if (!t)
             return false;
         if (!this.isSearchMatch)
             return false;
-        // Check filter boxes
-        if (!this.#table.filters?.length)
-            return true;
-        return this.#table.filters.every((fn) => fn(this));
+        if (t.uiFilters?.length && t.uiFilters?.some(filter => filter.isActive && !filter.fn(this)))
+            return false;
+        if (t.filters?.length && t.filters?.some(fn => !fn(this)))
+            return false;
+        return true;
     }
+    // I don't get why this is 3 methods but then other things are just get/set
     detailIsVisible = false;
     showDetail() {
         if (!this.detail || this.detailIsVisible)
@@ -254,7 +273,7 @@ class Row {
         this.#actionsAreOpen ? this.hideActions() : this.showActions();
     }
     #dismissActionsEvent = (e) => {
-        // Arrow function maintains "this" context
+        // Arrow to preserve this context
         if (this.cells.actions && this.cells.actions.contains(e.target))
             return;
         this.hideActions();

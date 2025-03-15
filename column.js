@@ -2,6 +2,7 @@ import { columnToTable } from './weakMaps.js';
 export { Column, BuiltInColumn };
 class Column {
     th = document.createElement('th');
+    summaryTd = document.createElement('td');
     col = document.createElement('col');
     colId = crypto.randomUUID();
     sortOrder = -1;
@@ -14,10 +15,11 @@ class Column {
         thButton.classList.add('sw-table-button');
         thButton.append(span, icon);
         this.th.append(thButton);
-        //this.th.id = `_${this.colId}`;
         this.th.scope = 'col';
+        this.th.classList.add('sw-table-th');
         this.th.dataset.isAscending = 'false';
         this.th.dataset.isCurrentSort = 'false';
+        this.th.dataset.id = this.colId;
         this.col.dataset.id = this.colId;
         //this.isReactive = typeof settings.isReactive === 'boolean' ? settings.isReactive : true;
         this.#render = typeof settings.render === 'function' ? settings.render : null;
@@ -27,6 +29,8 @@ class Column {
         this.sortBy = settings.sortBy;
         this.name = settings.name ?? '';
         this.th.draggable = true;
+        this.summaryTd.classList.add('sw-table-col-summary-td');
+        //if (typeof settings.width === 'string') this.col.style.width = settings.width;
         this.th.addEventListener('dragstart', (e) => {
             const table = this.#table;
             if (!table)
@@ -61,6 +65,15 @@ class Column {
             this.th.style.width = '';
             this.cellsCurrentPage.forEach(td => td.classList.remove('sw-table-dragging'));
         });
+        // Bug in chrome, I think drag is conflicting with hover highlight
+        // this.th.addEventListener('mouseover', () => {
+        //     this.th.style.backgroundColor = 'var(--color2)';
+        //     this.cells.forEach(el => el.style.backgroundColor = 'var(--color2)');
+        // });
+        // this.th.addEventListener('mouseout', () => {
+        //     this.th.style.backgroundColor = '';
+        //     this.cells.forEach(el => el.style.backgroundColor = '');
+        // });
     }
     // #isReactive = true;
     // get isReactive() {
@@ -96,7 +109,7 @@ class Column {
         const table = this.#table;
         if (!table)
             return;
-        this.#table._renderSummary();
+        this.#table._renderSummaries();
     }
     #name = '';
     get name() {
@@ -108,7 +121,7 @@ class Column {
     }
     get cells() {
         if (!this.#table)
-            return null;
+            return [];
         return this.#table.rows.map((row) => row.cells[this.colId]);
     }
     get cellsCurrentPage() {
@@ -136,7 +149,7 @@ class Column {
             return;
         const currentSortOrder = this.sortOrder;
         const targetSortOrder = index;
-        table.columns.forEach(col => {
+        for (const col of table.columns) {
             if (col === this) {
                 col.sortOrder = index; // Set the sortOrder for the moved column
             }
@@ -152,7 +165,8 @@ class Column {
                     col.sortOrder += 1;
                 }
             }
-        });
+        }
+        ;
         table.renderColumnTr();
         for (const row of table.rows)
             row.render();
