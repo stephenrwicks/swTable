@@ -1,8 +1,8 @@
 import { Row } from './row.js';
-import { DataObject, SwTable } from './table.js';
+import { SwTable } from './table.js';
 import { columnToTable } from './weakMaps.js';
 export { Column, ColumnSettings, BuiltInColumn };
-type ColumnSettings<T extends DataObject> = {
+type ColumnSettings<T extends Record<string, unknown> = Record<string, unknown>> = {
     render: (row: Row<T>) => HTMLElement | string;
     name?: string;
     //width?: string;
@@ -12,7 +12,7 @@ type ColumnSettings<T extends DataObject> = {
 }
 
 
-class Column<T extends DataObject = DataObject> {
+class Column<T extends Record<string, unknown> = Record<string, unknown>> {
 
     th = document.createElement('th');
     summaryTd = document.createElement('td');
@@ -158,15 +158,15 @@ class Column<T extends DataObject = DataObject> {
     }
 
     moveTo(index: number) {
-        const table = this.#table;
-        if (!table) throw new Error('SwTable - column moveTo');
+        const t = this.#table;
+        if (!t) throw new Error('SwTable - column moveTo');
         if (typeof index !== 'number') throw new Error('SwTable - column moveTo');
         if (index < 0) index = 0;
-        if (index > table.columns.length - 1) index = table.columns.length - 1;
+        if (index > t.columns.length - 1) index = t.columns.length - 1;
         if (this.sortOrder === index) return;
         const currentSortOrder = this.sortOrder;
         const targetSortOrder = index;
-        for (const col of table.columns) {
+        for (const col of t.columns) {
             if (col === this) {
                 col.sortOrder = index; // Set the sortOrder for the moved column
             }
@@ -183,8 +183,9 @@ class Column<T extends DataObject = DataObject> {
                 }
             }
         };
-        table.renderColumnTr();
-        for (const row of table.rows) row.render();
+        t.renderColumnTr();
+        for (const row of t.rows) row.render();
+        t._renderSummaries();
         return this.sortOrder;
     }
 
@@ -252,6 +253,8 @@ class Column<T extends DataObject = DataObject> {
         this.th.dataset.isAscending = String(this.#isAscending);
         this.th.dataset.isCurrentSort = String(this.#isCurrentSort);
         this.#table.goToPage(1);
+
+        // Unsort method? Or put it in here? Third state where sort is canceled
     }
 
     isShowing = true;

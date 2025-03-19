@@ -155,6 +155,9 @@ class SwTable {
         if (Array.isArray(settings.data) && settings.data.length)
             this.setData(settings.data);
     }
+    /**
+     *  Sets data and creates instances of all Row objects
+    */
     setData(data) {
         if (!Array.isArray(data)) {
             console.error('setData');
@@ -359,15 +362,17 @@ class SwTable {
         // This can get pretty expensive fast
         return this.rows.filter(row => row.isFilterTrue);
     }
-    get #rowsFilterTruePartitionedByPage() {
+    // Probably this entire method should be removed
+    #getRowsFilterTruePartitionedByPage() {
+        const rowsFilterTrue = this.rowsFilterTrue;
         if (this.#pageLength === 0)
-            return [this.rowsFilterTrue]; // If pageLength is 0, one page
+            return [rowsFilterTrue];
         return Array.from({ length: this.numberOfPages }, (_, i) => {
-            return this.rowsFilterTrue.slice(i * this.#pageLength, (i + 1) * this.#pageLength);
+            return rowsFilterTrue.slice(i * this.#pageLength, (i + 1) * this.#pageLength);
         });
     }
     get rowsCurrentPage() {
-        return this.#rowsFilterTruePartitionedByPage[this.#currentPage - 1] ?? [];
+        return this.#getRowsFilterTruePartitionedByPage()[this.#currentPage - 1] ?? [];
     }
     get rowsChecked() {
         return this.rowsFilterTrue.filter(row => row.isChecked);
@@ -389,9 +394,22 @@ class SwTable {
         }
     }
     updateSelectAllCheckbox() {
-        this.#els.selectAllCheckbox.style.visibility = this.rowsFilterTrue.some(row => !!row.checkbox) ? 'visible' : 'hidden';
-        const allChecked = this.rowsFilterTrue.every(row => row.isChecked);
-        const someChecked = this.rowsFilterTrue.some(row => row.isChecked);
+        console.log('updateSelectAllCheckbox');
+        let visibility = 'hidden';
+        let someChecked = false;
+        let allChecked = true;
+        for (const row of this.rowsFilterTrue) {
+            if (!row.checkbox)
+                continue;
+            visibility = '';
+            if (row.isChecked) {
+                someChecked = true;
+            }
+            else {
+                allChecked = false;
+            }
+        }
+        this.#els.selectAllCheckbox.style.visibility = visibility;
         this.#els.selectAllCheckbox.checked = allChecked;
         this.#els.selectAllCheckbox.indeterminate = !allChecked && someChecked;
     }
@@ -405,33 +423,49 @@ class SwTable {
         this.goToPage(1);
     }
     // This is the single DOM placement method
-    // Update select all should be in here
     goToPage(n) {
         if (typeof n !== 'number')
             return;
+        // Updated this 3-18-25
+        // Should only filter rows once on render
+        const rowsFilterTrue = this.rowsFilterTrue;
+        const numberOfPages = this.#pageLength ? Math.ceil(rowsFilterTrue.length / this.#pageLength) : 1;
+        // Use a classic for loop for efficiency
+        const rowsFilterTruePartitionedByPage = [];
+        if (numberOfPages === 0) {
+            rowsFilterTruePartitionedByPage.push(rowsFilterTrue);
+        }
+        else {
+            for (let i = 0; i < numberOfPages; i++) {
+                rowsFilterTruePartitionedByPage.push(rowsFilterTrue.slice(i * this.#pageLength, (i + 1) * this.#pageLength));
+            }
+        }
         n = Math.floor(n);
         if (n < 1)
             n = 1;
-        if (n > this.numberOfPages)
-            n = this.numberOfPages;
-        this.#els.tbody.replaceChildren();
+        if (n > numberOfPages)
+            n = numberOfPages;
         this.#currentPage = n;
-        const rowsToShow = this.rowsCurrentPage;
+        const documentFragment = document.createDocumentFragment();
+        const rowsToShow = rowsFilterTruePartitionedByPage[n - 1] ?? [];
         rowsToShow.forEach((row, i) => {
             row.tr.className = i % 2 === 1 ? 'sw-table-tr-odd' : '';
-            this.#els.tbody.append(row.tr);
+            documentFragment.append(row.tr);
             if (row.detail && row.detailIsVisible)
-                this.#els.tbody.append(row.detail.tr);
+                documentFragment.append(row.detail.tr);
         });
         this._renderSummaries();
-        const rowsFilterTrue = this.rowsFilterTrue;
-        const first = rowsFilterTrue.indexOf(rowsToShow[0]) + 1;
-        const last = rowsFilterTrue.indexOf(rowsToShow[rowsToShow.length - 1]) + 1;
-        this.#els.tfootTd.colSpan = this.colSpan;
-        this.#els.pageNumberDiv.textContent = `Showing ${first}-${last} of ${rowsFilterTrue.length}`;
-        this.#els.nextPageButton.style.visibility = this.currentPage < this.numberOfPages ? 'visible' : 'hidden';
-        this.#els.prevPageButton.style.visibility = this.currentPage > 1 ? 'visible' : 'hidden';
+        const firstOfPage = rowsFilterTrue.indexOf(rowsToShow[0]) + 1;
+        const lastOfPage = rowsFilterTrue.indexOf(rowsToShow[rowsToShow.length - 1]) + 1;
+        this.#els.pageNumberDiv.textContent = `Showing ${firstOfPage}-${lastOfPage} of ${rowsFilterTrue.length}`;
+        this.#els.nextPageButton.style.visibility = n < numberOfPages ? 'visible' : 'hidden';
+        this.#els.prevPageButton.style.visibility = n > 1 ? 'visible' : 'hidden';
         //this.updateSelectAllCheckbox();
+        this.#els.tbody.replaceChildren(documentFragment);
+        // TODO:
+        // Fix all colspans here
+        const colSpan = this.colSpan;
+        this.#els.tfootTd.colSpan = colSpan;
     }
     renderColumnTr() {
         this.#els.colgroup.replaceChildren();

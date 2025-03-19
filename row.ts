@@ -1,11 +1,11 @@
 import { Detail } from './detail.js';
 import { Observable } from './observable.js';
 import { rowToTable } from './weakMaps.js';
-import { SwTable, DataObject } from './table.js';
+import { SwTable } from './table.js';
 export { Row };
 
 
-class Row<T extends DataObject = DataObject> {
+class Row<T extends Record<string, unknown> = Record<string, unknown>> {
 
     // Force initialization with an empty object that is typed as T
     #observable = new Observable<T>({} as T);
@@ -22,13 +22,14 @@ class Row<T extends DataObject = DataObject> {
     }
 
 
-    get #table(): SwTable<T> {
+    #getTable(): SwTable<T> | undefined {
         return rowToTable.get(this);
     }
 
     get index() {
-        if (!this.#table) return -1;
-        return this.#table.rows.indexOf(this);
+        const t = this.#getTable();
+        if (!t) return -1;
+        return t.rows.indexOf(this);
     }
 
     moveTo(index: number) {
@@ -36,14 +37,15 @@ class Row<T extends DataObject = DataObject> {
     }
 
     render() {
-        if (!this.#table) return;
+        const t = this.#getTable();
+        if (!t) return;
         this.#tr.replaceChildren();
-        if (this.#table.columnsObject.detail) {
+        if (t.columnsObject.detail) {
             this.cells.detail ??= document.createElement('td');
             this.renderDetail();
             this.#tr.append(this.cells.detail);
         }
-        for (const column of this.#table.columns) {
+        for (const column of t.columns) {
             if (!column.isShowing) continue; // Skip hidden columns
             this.cells[column.colId] ??= document.createElement('td');
             const td = this.cells[column.colId];
@@ -51,12 +53,12 @@ class Row<T extends DataObject = DataObject> {
             if (column.render) td.replaceChildren(column.render(this));
             this.#tr.append(td);
         }
-        if (this.#table.columnsObject.actions) {
+        if (t.columnsObject.actions) {
             this.cells.actions ??= document.createElement('td');
             this.renderActions();
             this.#tr.append(this.cells.actions);
         }
-        if (this.#table.columnsObject.checkbox) {
+        if (t.columnsObject.checkbox) {
             this.cells.checkbox ??= document.createElement('td');
             this.renderCheckbox();
             this.#tr.append(this.cells.checkbox);
@@ -68,8 +70,9 @@ class Row<T extends DataObject = DataObject> {
     detailButton: HTMLButtonElement | null = null;
     // These are rendering the contents, not the cells
     renderDetail() {
-        if (!this.#table) return;
-        const detailContents = this.#table.detailFn ? this.#table.detailFn(this) : null;
+        const t = this.#getTable();
+        if (!t) return;
+        const detailContents = t.detailFn ? t.detailFn(this) : null;
         if (detailContents === null) {
             this.detail?.tr.remove();
             this.detail = null;
@@ -78,7 +81,7 @@ class Row<T extends DataObject = DataObject> {
         }
         else {
             this.detail ??= new Detail();
-            this.detail.render(detailContents, this.#table.colSpan);
+            this.detail.render(detailContents, t.colSpan);
             if (this.detailButton === null) {
                 this.detailButton = document.createElement('button');
                 const icon = document.createElement('div');
@@ -94,14 +97,15 @@ class Row<T extends DataObject = DataObject> {
     }
     checkbox: HTMLInputElement | null = null;
     renderCheckbox() {
-        if (!this.#table) return;
-        if (typeof this.#table.checkboxFn === 'function' && this.#table.checkboxFn(this)) {
+        const t = this.#getTable();
+        if (!t) return;
+        if (typeof t.checkboxFn === 'function' && t.checkboxFn(this)) {
             this.checkbox ??= document.createElement('input');
             this.checkbox.classList.add('sw-table-checkbox');
             this.checkbox.type = 'checkbox';
             this.tr.dataset.isChecked = String(!!this.checkbox?.checked);
             this.checkbox.addEventListener('change', () => {
-                this.#table?.updateSelectAllCheckbox();
+                t?.updateSelectAllCheckbox();
                 this.tr.dataset.isChecked = String(!!this.checkbox?.checked);
             });
             this.cells.checkbox?.append(this.checkbox);
@@ -114,8 +118,9 @@ class Row<T extends DataObject = DataObject> {
 
     actionsButton: HTMLButtonElement | null = null;
     renderActions() {
-        if (!this.#table) return;
-        const actionsArray = typeof this.#table.actionsFn === 'function' ? this.#table.actionsFn(this) : null;
+        const t = this.#getTable();
+        if (!t) return;
+        const actionsArray = typeof t.actionsFn === 'function' ? t.actionsFn(this) : null;
         if (!Array.isArray(actionsArray) || !actionsArray.length) {
             this.actionsButton?.remove();
             this.actionsButton = null
@@ -134,9 +139,10 @@ class Row<T extends DataObject = DataObject> {
     }
 
     #buildActionsDiv(): HTMLDivElement | null {
-        if (!this.#table) return null;
-        if (typeof this.#table.actionsFn !== 'function') return null;
-        const actions = this.#table.actionsFn(this);
+        const t = this.#getTable();
+        if (!t) return null;
+        if (typeof t.actionsFn !== 'function') return null;
+        const actions = t.actionsFn(this);
         if (!actions) return null;
         if (!actions.length) return null;
         const div = document.createElement('div');
@@ -168,7 +174,7 @@ class Row<T extends DataObject = DataObject> {
         this.#observable.target = data;
         this.#observable.callbacks = [
             () => this.render(),
-            () => this.#table._renderSummaries()
+            () => this.#getTable()?._renderSummaries()
         ];
         this.render();
     }
@@ -192,8 +198,7 @@ class Row<T extends DataObject = DataObject> {
         // Therefore we can exclude certain elements by giving them an "ignore" class
         // 3-15-25 I tried to make this efficient by removing spreads, filters, maps, etc
         // and just using for...of with as much short circuiting as possible
-        console.log('hello');
-        const t = this.#table;
+        const t = this.#getTable();
         if (!t) return false;
         const searchInput = t.searchInput;
         if (!searchInput.value) return true;
@@ -215,7 +220,8 @@ class Row<T extends DataObject = DataObject> {
     };
 
     get isFilterTrue() {
-        const t = this.#table;
+        console.log('isFilterTrue fired');
+        const t = this.#getTable();
         if (!t) return false;
         if (!this.isSearchMatch) return false;
         if (t.uiFilters?.length && t.uiFilters?.some(filter => filter.isActive && !filter.fn(this))) return false;
@@ -274,9 +280,10 @@ class Row<T extends DataObject = DataObject> {
     }
 
     destroy() {
-        this.#table?.rows.splice(this.index, 1);
+        const t = this.#getTable();
+        t?.rows.splice(this.index, 1);
         this.detail = null;
-        if (this.checkbox) this.#table?.updateSelectAllCheckbox();
+        if (this.checkbox) t?.updateSelectAllCheckbox();
         this.checkbox = null;
         this.#tr.remove();
         this.#tr = null as any;
@@ -284,7 +291,7 @@ class Row<T extends DataObject = DataObject> {
         this.#observable = null as any;
         this.detailButton = null;
         this.actionsButton = null;
-        this.#table?.goToPage(this.#table.currentPage);
+        t?.goToPage(t.currentPage);
         rowToTable.delete(this);
     }
 

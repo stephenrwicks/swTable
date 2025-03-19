@@ -7,7 +7,7 @@ type SwTableData = {
     discount: boolean;
 };
 
-const x = new SwTable<SwTableData>({
+const x = new SwTable({
     pageLengthOptions: [5, 10, 20],
     columns: [
         {
@@ -30,9 +30,9 @@ const x = new SwTable<SwTableData>({
             summary(table) {
                 let totalQ = 0;
                 // This is maybe a little too verbose. Should an implementation need to know about the entire table
-                for (const row of table.rowsFilterTrue) {
-                    totalQ += row.data.quantity;
-                }
+                // for (const row of table.rowsFilterTrue) {
+                //     totalQ += row.data.quantity;
+                // }
                 return `${totalQ}`;
             }
         },
@@ -123,11 +123,12 @@ const x = new SwTable<SwTableData>({
         return row.data.quantity > 3;
     },
     overallSummaryFn(table) {
-        let total = 0;
-        for (const row of table.rowsFilterTrue) {
-            total += row.data.quantity * row.data.price;
-        }
-        return `Total: ${total.toFixed(2)}`;
+        return '';
+        // let total = 0;
+        // for (const row of table.rowsFilterTrue) {
+        //     total += row.data.quantity * row.data.price;
+        // }
+        // return `Total: ${total.toFixed(2)}`;
     },
     uiFilters: [
         {

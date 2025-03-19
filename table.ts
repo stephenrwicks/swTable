@@ -37,10 +37,10 @@
 import { Column, ColumnSettings, BuiltInColumn } from './column.js';
 import { Row } from './row.js';
 import { rowToTable, columnToTable } from './weakMaps.js';
-export { SwTable, DataObject };
+export { SwTable };
 
-type DataObject = Record<string, unknown>;
-type SwTableSettings<T extends DataObject = DataObject> = {
+
+type SwTableSettings<T extends Record<string, unknown> = Record<string, unknown>> = {
     columns: Array<ColumnSettings<T>>;
     theme?: 'mint' | 'ice'; // Not yet implemented
     data?: Array<T>;
@@ -66,7 +66,7 @@ type SwTableSettings<T extends DataObject = DataObject> = {
 }
 
 
-class SwTable<T extends DataObject = DataObject> {
+class SwTable<T extends Record<string, unknown> = Record<string, unknown>> {
 
     #els = {
         wrapper: document.createElement('div'),
@@ -110,6 +110,9 @@ class SwTable<T extends DataObject = DataObject> {
             columnToTable.set(column, this);
             this.columnsObject[column.colId] = column;
         });
+
+
+
 
         if (typeof settings.detailFn === 'function') this.detailFn = settings.detailFn;
         if (typeof settings.actionsFn === 'function') this.actionsFn = settings.actionsFn;
@@ -205,8 +208,9 @@ class SwTable<T extends DataObject = DataObject> {
 
     }
 
-
-
+    /**
+     *  Sets data and creates instances of all Row objects
+    */
     setData(data: Array<T>) {
         if (!Array.isArray(data)) {
             console.error('setData');
@@ -282,7 +286,7 @@ class SwTable<T extends DataObject = DataObject> {
     get rows() {
         return this.#rows;
     }
-    
+
     insertRow(data: T, index?: number): Row<T> {
         const row = new Row<T>();
         rowToTable.set(row, this);
@@ -356,7 +360,6 @@ class SwTable<T extends DataObject = DataObject> {
         this._renderSummaries();
     }
 
-
     #filters: Array<(row: Row<T>) => boolean> | null = null;
     get filters() {
         return this.#filters;
@@ -372,7 +375,6 @@ class SwTable<T extends DataObject = DataObject> {
     set uiFilters(filters: SwTableSettings<T>['uiFilters'] | null) {
         this.#uiFilters = filters;
     }
-
 
     #pageLengthOptions: Array<number> | null = null;
     get pageLengthOptions() {
@@ -431,15 +433,17 @@ class SwTable<T extends DataObject = DataObject> {
         return this.rows.filter(row => row.isFilterTrue);
     }
 
-    get #rowsFilterTruePartitionedByPage() {
-        if (this.#pageLength === 0) return [this.rowsFilterTrue]; // If pageLength is 0, one page
+    // Probably this entire method should be removed
+    #getRowsFilterTruePartitionedByPage(): Array<Array<Row<T>>> {
+        const rowsFilterTrue = this.rowsFilterTrue;
+        if (this.#pageLength === 0) return [rowsFilterTrue];
         return Array.from({ length: this.numberOfPages }, (_, i) => {
-            return this.rowsFilterTrue.slice(i * this.#pageLength, (i + 1) * this.#pageLength);
+            return rowsFilterTrue.slice(i * this.#pageLength, (i + 1) * this.#pageLength);
         });
     }
 
     get rowsCurrentPage() {
-        return this.#rowsFilterTruePartitionedByPage[this.#currentPage - 1] ?? [];
+        return this.#getRowsFilterTruePartitionedByPage()[this.#currentPage - 1] ?? [];
     }
 
     get rowsChecked() {
@@ -464,9 +468,21 @@ class SwTable<T extends DataObject = DataObject> {
     }
 
     updateSelectAllCheckbox() {
-        this.#els.selectAllCheckbox.style.visibility = this.rowsFilterTrue.some(row => !!row.checkbox) ? 'visible' : 'hidden';
-        const allChecked = this.rowsFilterTrue.every(row => row.isChecked);
-        const someChecked = this.rowsFilterTrue.some(row => row.isChecked);
+        console.log('updateSelectAllCheckbox');
+        let visibility = 'hidden';
+        let someChecked = false;
+        let allChecked = true;
+        for (const row of this.rowsFilterTrue) {
+            if (!row.checkbox) continue;
+            visibility = '';
+            if (row.isChecked) {
+                someChecked = true;
+            }
+            else {
+                allChecked = false;
+            }
+        }
+        this.#els.selectAllCheckbox.style.visibility = visibility;
         this.#els.selectAllCheckbox.checked = allChecked;
         this.#els.selectAllCheckbox.indeterminate = !allChecked && someChecked;
     }
@@ -482,31 +498,53 @@ class SwTable<T extends DataObject = DataObject> {
     }
 
     // This is the single DOM placement method
-    // Update select all should be in here
     goToPage(n: number) {
         if (typeof n !== 'number') return;
+        // Updated this 3-18-25
+        // Should only filter rows once on render
+        const rowsFilterTrue = this.rowsFilterTrue;
+        const numberOfPages = this.#pageLength ? Math.ceil(rowsFilterTrue.length / this.#pageLength) : 1;
+
+        // Use a classic for loop for efficiency
+        const rowsFilterTruePartitionedByPage = [];
+        if (numberOfPages === 0) {
+            rowsFilterTruePartitionedByPage.push(rowsFilterTrue);
+        }
+        else {
+            for (let i = 0; i < numberOfPages; i++) {
+                rowsFilterTruePartitionedByPage.push(rowsFilterTrue.slice(i * this.#pageLength, (i + 1) * this.#pageLength));
+              }
+        }
+
         n = Math.floor(n);
         if (n < 1) n = 1;
-        if (n > this.numberOfPages) n = this.numberOfPages;
-        this.#els.tbody.replaceChildren();
+        if (n > numberOfPages) n = numberOfPages;
+
         this.#currentPage = n;
-        const rowsToShow = this.rowsCurrentPage;
+
+        const documentFragment = document.createDocumentFragment();
+        const rowsToShow = rowsFilterTruePartitionedByPage[n - 1] ?? [];
         rowsToShow.forEach((row, i) => {
             row.tr.className = i % 2 === 1 ? 'sw-table-tr-odd' : '';
-            this.#els.tbody.append(row.tr);
-            if (row.detail && row.detailIsVisible) this.#els.tbody.append(row.detail.tr);
+            documentFragment.append(row.tr);
+            if (row.detail && row.detailIsVisible) documentFragment.append(row.detail.tr);
         });
-
         this._renderSummaries();
-        const rowsFilterTrue = this.rowsFilterTrue;
 
-        const first = rowsFilterTrue.indexOf(rowsToShow[0]) + 1;
-        const last = rowsFilterTrue.indexOf(rowsToShow[rowsToShow.length - 1]) + 1;
-        this.#els.tfootTd.colSpan = this.colSpan;
-        this.#els.pageNumberDiv.textContent = `Showing ${first}-${last} of ${rowsFilterTrue.length}`;
-        this.#els.nextPageButton.style.visibility = this.currentPage < this.numberOfPages ? 'visible' : 'hidden';
-        this.#els.prevPageButton.style.visibility = this.currentPage > 1 ? 'visible' : 'hidden';
+        const firstOfPage = rowsFilterTrue.indexOf(rowsToShow[0]) + 1;
+        const lastOfPage = rowsFilterTrue.indexOf(rowsToShow[rowsToShow.length - 1]) + 1;
+
+        this.#els.pageNumberDiv.textContent = `Showing ${firstOfPage}-${lastOfPage} of ${rowsFilterTrue.length}`;
+        this.#els.nextPageButton.style.visibility = n < numberOfPages ? 'visible' : 'hidden';
+        this.#els.prevPageButton.style.visibility = n > 1 ? 'visible' : 'hidden';
         //this.updateSelectAllCheckbox();
+        this.#els.tbody.replaceChildren(documentFragment);
+
+
+        // TODO:
+        // Fix all colspans here
+        const colSpan = this.colSpan;
+        this.#els.tfootTd.colSpan = colSpan;
     }
 
     renderColumnTr() {

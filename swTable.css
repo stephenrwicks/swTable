@@ -1,6 +1,6 @@
 .sw-table-wrapper {
     width: 900px;
-    position: relative;
+    /* position: relative; */
 
     .sw-table-column-dialog {
         position: absolute;
@@ -44,7 +44,6 @@
         /* &:has(thead tr .sw-table-th:nth-child(3):hover) tbody tr td:nth-child(3) {
             background-color: var(--color2);
         } */
-
 
         .sw-table-header {
             display: flex;
@@ -106,16 +105,9 @@
                 background-color: var(--rowHoverBackgroundColor);
             }
 
-            &:has(+.sw-table-detail-tr) {
-                /* border-top: 1px solid var(--innerBorderColor); */
-                /* border-left: 1px solid var(--innerBorderColor);
-            border-right: 1px solid var(--innerBorderColor); */
-
-                .sw-table-detail-button .sw-table-icon {
-                    rotate: 90deg;
-                }
+            &:has(+.sw-table-detail-tr) .sw-table-detail-button .sw-table-icon {
+                rotate: 90deg;
             }
-
             &[data-is-checked="true"], &[data-is-checked="true"]:hover {
                 background-color: var(--rowSelectedColor);
             }
@@ -220,10 +212,10 @@
             grid-area: 1/1/1/1;
             padding: 2px 2px 2px 25px;
             border: 0px;
-            outline: 1px solid var(--buttonFocusColor);
+            outline: 1px solid var(--fontColor);
 
             &:focus {
-                background-color: var(--buttonHoverBackground);
+                background-color: var(--inputFocusColor);
             }
         }
 
@@ -293,7 +285,8 @@
     --rowSelectedColor: var(--color2);
     --detailBackgroundColor: var(--color2);
     --boxShadow: 0px 0px 2px 2px #ccc;
-    --buttonFocusColor: darkblue;
+    --inputFocusColor: var(--color2);
+    --buttonFocusColor: blue;
     --innerBorderColor: #ccc;
     --outerBorderColor: #fff;
     --theadBackgroundColor: var(--rowOddBackgroundColor);

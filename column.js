@@ -136,20 +136,20 @@ class Column {
         return this.moveTo(this.sortOrder + 1);
     }
     moveTo(index) {
-        const table = this.#table;
-        if (!table)
+        const t = this.#table;
+        if (!t)
             throw new Error('SwTable - column moveTo');
         if (typeof index !== 'number')
             throw new Error('SwTable - column moveTo');
         if (index < 0)
             index = 0;
-        if (index > table.columns.length - 1)
-            index = table.columns.length - 1;
+        if (index > t.columns.length - 1)
+            index = t.columns.length - 1;
         if (this.sortOrder === index)
             return;
         const currentSortOrder = this.sortOrder;
         const targetSortOrder = index;
-        for (const col of table.columns) {
+        for (const col of t.columns) {
             if (col === this) {
                 col.sortOrder = index; // Set the sortOrder for the moved column
             }
@@ -167,9 +167,10 @@ class Column {
             }
         }
         ;
-        table.renderColumnTr();
-        for (const row of table.rows)
+        t.renderColumnTr();
+        for (const row of t.rows)
             row.render();
+        t._renderSummaries();
         return this.sortOrder;
     }
     destroy() {
@@ -238,6 +239,7 @@ class Column {
         this.th.dataset.isAscending = String(this.#isAscending);
         this.th.dataset.isCurrentSort = String(this.#isCurrentSort);
         this.#table.goToPage(1);
+        // Unsort method? Or put it in here? Third state where sort is canceled
     }
     isShowing = true;
     show() {
